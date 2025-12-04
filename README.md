@@ -241,4 +241,4 @@ WHERE   user_id = %(user_id)s
 
 - Q: is it safe from SQL injection when using conditional?
 
-- A: yes, you can only use number, string(enclosed with `'` or `"`) and paramter name in conditional line or error raised
+- A: yes, you can only use number, string(enclosed with `'` or `"`), Python operator and paramter name in conditional line or error raised
