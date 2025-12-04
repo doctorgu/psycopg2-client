@@ -126,7 +126,7 @@ FROM    t;
         print("affected row count:", row_count)
 ```
 
-## read_row vs read_rows
+## read_row & read_rows
 
 - read_row only returns first one row
 
@@ -236,3 +236,9 @@ WHERE   user_id = %(user_id)s
     # [{"아이디": "gildong.hong", "이름": "홍길동"}]
     print(json.dumps(rows, ensure_ascii=False))
 ```
+
+## Q&A
+
+- Q: is it safe from SQL injection when using conditional?
+
+- A: yes, you can only use number, string(enclosed with `'` or `"`) and paramter name in conditional line or error raised
