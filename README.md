@@ -250,5 +250,3 @@ MIT (or as defined in your project)
 ---
 
 Made with ❤️ for cleaner, safer PostgreSQL code in Python.
-
----
