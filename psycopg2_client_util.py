@@ -106,7 +106,7 @@ def get_conditional(qry_str: str, params: dict) -> str:
 
 def rep_kv(query: str, tab_count: int, **kwargs) -> str:
     """
-    replace {key} with value when `rev_ky("WHERE name = {key}", key="u.name")`
+    replace {key} with value when `rev_ky("WHERE user_name = {key}", key="u.user_name")`
     """
 
     ret = query

@@ -66,6 +66,7 @@ class Psycopg2Client:
         self.cursor = None
         self.in_with_block = False
         self.db_settings = db_settings
+        self.query_recent = ""
 
         if not db_pool:
             db_pool = Psycopg2ClientPool(db_settings)

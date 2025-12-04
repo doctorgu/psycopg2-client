@@ -18,14 +18,14 @@ class Psycopg2ClientSettings:
     connect_timeout: int
 
     use_en_ko_column_alias: bool
-    """tbl.obj_nm "File Name|파일명" """
+    """SELECT file_name "File Name|파일명" """
 
     use_conditional: bool
     """
-    #if target == 'upload'
-        FROM tbl_col_upload
+    #if target == 'korea'
+        FROM tbl_korea
     #else
-        FROM tbl_col_collect
+        FROM tbl_vietnam
     #endif
     """
 
