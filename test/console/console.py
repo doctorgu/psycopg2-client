@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
 
 # pylint: disable=wrong-import-position
+from db_client import DbClient
 from psycopg2_client import Psycopg2Client
 from psycopg2_client_settings import Psycopg2ClientSettings
-from db_client import DbClient
 
 load_dotenv()
 

@@ -4,6 +4,7 @@ import csv
 from datetime import datetime, date
 import io
 import atexit
+import json
 import re
 from typing import AsyncGenerator
 import humps
@@ -174,6 +175,13 @@ class Psycopg2Client:
 
             qry_type_params_list[i] = (qry_type, params, params_out)
 
+    def _get_query_by_qry_type(self, qry_type: str, en: bool = None) -> str:
+        query = qry_dic.get(qry_type)
+        if not query:
+            raise KeyError(f"{qry_type} not exists")
+
+        return f"/* {qry_type} {en} */{query}"
+
     def read_rows(
         self,
         qry_type: str,
@@ -207,9 +215,7 @@ class Psycopg2Client:
             if not isinstance(params, dict):
                 params = vars(params)
 
-            qry_str = qry_dic.get(qry_type)
-            if not qry_str:
-                raise KeyError(f"{qry_type} not exists")
+            qry_str = self._get_query_by_qry_type(qry_type, en)
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -314,7 +320,7 @@ class Psycopg2Client:
                 params = vars(params)
 
             cursor_name = "cur_partial"
-            qry_str = f"DECLARE {cursor_name} CURSOR FOR {qry_dic.get(qry_type)}"
+            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, en)}"
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -398,7 +404,7 @@ class Psycopg2Client:
             for item in qry_type_params_list:
                 qry_type, params, params_out = item
 
-                qry_str = qry_dic.get(qry_type)
+                qry_str = self._get_query_by_qry_type(qry_type)
                 if not qry_str:
                     raise KeyError(f"{qry_type} not exists")
                 if self.db_settings.use_conditional and "#if" in qry_str:
@@ -452,7 +458,7 @@ def close_all_connection():
     # pylint:disable=global-statement
     global db_set_and_pool
 
-    for k, v in db_set_and_pool.items():
+    for v in db_set_and_pool.values():
         if v:
             v = None
     db_set_and_pool = {}
