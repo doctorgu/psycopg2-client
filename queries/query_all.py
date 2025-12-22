@@ -1,9 +1,9 @@
 """query collection"""
 
-from queries.query_cud import qry_dic as query_cud
+from queries.query_write import qry_dic as query_write
 from queries.query_read import qry_dic as query_read
 
-qry_all = [query_cud, query_read]
+qry_all = [query_write, query_read]
 
 qry_dic = {}
 for qry_cur in qry_all:
