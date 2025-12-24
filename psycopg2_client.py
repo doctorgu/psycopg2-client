@@ -1,12 +1,14 @@
 """database client"""
 
+import asyncio
 import csv
 from datetime import datetime, date
 import io
 import atexit
 import json
 import re
-from typing import AsyncGenerator, Literal
+from typing import AsyncGenerator, Generator, Literal
+import time
 import humps
 from psycopg2 import pool, sql
 from psycopg2.extras import RealDictCursor, RealDictRow
@@ -299,7 +301,7 @@ class Psycopg2Client:
 
         return rows[0]
 
-    async def read_partial_to_csv(
+    async def read_csv_partial_async(
         self,
         qry_type: str,
         params: dict,
@@ -307,7 +309,7 @@ class Psycopg2Client:
         row_count_partial: int = 100,
         en: bool = None,
     ) -> AsyncGenerator[bytes, None]:
-        """Return rows in batches of row_count_partial
+        """Return rows partially in batches with async
 
         Arguments:
             qry_type: key of the Dictionary registered in the clients/queries folder
@@ -318,7 +320,7 @@ class Psycopg2Client:
             CSV format converted to UTF-8-BOM
         """
 
-        async def read_partial_to_csv_by_param(
+        async def read_csv_partial_async_by_param(
             qry_type: str,
             params: dict,
             *,
@@ -339,6 +341,10 @@ class Psycopg2Client:
             rows: list[RealDictRow] = []
             is_second = False
 
+            # without  UTF-8 BOM, hangul will be broken.
+            utf8_bom = b"\xef\xbb\xbf"
+            yield utf8_bom
+
             cursor.execute(qry_str, params)
             while True:
                 cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
@@ -351,16 +357,14 @@ class Psycopg2Client:
                 csv_w = csv.DictWriter(csv_out, rows[0].keys())
                 if not is_second:
                     csv_w.writeheader()
-
                 csv_w.writerows(rows)
+
+                yield csv_out.getvalue().encode("utf-8")
 
                 is_second = True
 
-                # without utf-8-sig, hangul will be broken.
-                yield csv_out.getvalue().encode("utf-8-sig")
-
         if self.in_with_block:
-            async for value in read_partial_to_csv_by_param(
+            async for value in read_csv_partial_async_by_param(
                 qry_type,
                 params,
                 row_count_partial=row_count_partial,
@@ -373,7 +377,95 @@ class Psycopg2Client:
             try:
                 conn = conn_pool.getconn()
                 cursor = conn.cursor(cursor_factory=RealDictCursor)
-                async for value in read_partial_to_csv_by_param(
+                async for value in read_csv_partial_async_by_param(
+                    qry_type,
+                    params,
+                    row_count_partial=row_count_partial,
+                    en=en,
+                    cursor=cursor,
+                ):
+                    yield value
+            finally:
+                cursor.close()
+                conn_pool.putconn(conn)
+
+    def read_csv_partial(
+        self,
+        qry_type: str,
+        params: dict,
+        *,
+        row_count_partial: int = 100,
+        en: bool = None,
+    ) -> Generator[bytes, None, None]:
+        """Return rows partially in batches
+
+        Arguments:
+            qry_type: key of the Dictionary registered in the clients/queries folder
+            params: key, value pairs to pass as parameters to the SQL query.
+            row_count_partial: Number of rows to return at a time
+
+        Returns:
+            CSV format converted to UTF-8-BOM
+        """
+
+        def read_csv_partial_by_param(
+            qry_type: str,
+            params: dict,
+            *,
+            row_count_partial: int = 100,
+            en: bool = None,
+            cursor: any,
+        ) -> Generator[bytes, None, None]:
+            if not isinstance(params, dict):
+                params = vars(params)
+
+            cursor_name = "cur_partial"
+            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, "csv", en)}"
+            if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
+                qry_str = self._replace_en_ko_column_alias(qry_str, en)
+            if self.db_settings.use_conditional and "#if" in qry_str:
+                qry_str = get_conditional(qry_str, params)
+
+            rows: list[RealDictRow] = []
+            is_second = False
+
+            # without UTF-8 BOM, hangul will be broken.
+            utf8_bom = b"\xef\xbb\xbf"
+            yield utf8_bom
+
+            cursor.execute(qry_str, params)
+            while True:
+                cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
+                rows = cursor.fetchall()
+
+                if not rows:
+                    break
+
+                csv_out = io.StringIO()
+                csv_w = csv.DictWriter(csv_out, rows[0].keys())
+                if not is_second:
+                    csv_w.writeheader()
+                csv_w.writerows(rows)
+
+                yield csv_out.getvalue().encode("utf-8")
+
+                is_second = True
+
+        if self.in_with_block:
+            for value in read_csv_partial_by_param(
+                qry_type,
+                params,
+                row_count_partial=row_count_partial,
+                en=en,
+                cursor=self.cursor,
+            ):
+                yield value
+        else:
+            conn_pool = Psycopg2Client._conn_pool
+            try:
+                conn = conn_pool.getconn()
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                for value in read_csv_partial_by_param(
                     qry_type,
                     params,
                     row_count_partial=row_count_partial,

@@ -132,6 +132,60 @@ with Psycopg2Client(db_settings=db_settings) as db:
     print("This won't print if error occurs")
 ```
 
+## Partially return CSV
+
+Read rows partially and return immediately to client to show progress in client
+
+```python
+# Flask
+@app.route("/read-csv-partial")
+def read_csv_partial():
+    """read csv partial"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+
+    return Response(
+        db_client.read_csv_partial("read_csv_partial", {}),
+        mimetype="text/csv",
+        headers={
+            # if FE and BE are on different origins, server must expose the Content-Disposition header
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Very important for progressive saving in many browsers
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",  # Important if using nginx
+            "Transfer-Encoding": "chunked",
+        },
+    )
+
+# Fast API
+@router.get("/read-csv-partial-async")
+async def read_csv_partial_async():
+    """read csv partial async"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+
+    return StreamingResponse(
+        content=db_client.read_csv_partial_async("read_csv_partial", {}),
+        media_type="text/csv",
+        headers={
+            # if FE and BE are on different origins, server must expose the Content-Disposition header
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Very important for progressive saving in many browsers
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",  # Important if using nginx
+            "Transfer-Encoding": "chunked",
+        },
+    )
+```
+
 ## Conditional SQL (`#if`, `#elif`, `#endif`)
 
 Enabled when `use_conditional=True`
@@ -231,17 +285,18 @@ Any attempt to inject raw SQL will raise a parsing error **before** execution.
 
 ## Features Summary
 
-| Feature                      | Supported | Notes                              |
-| ---------------------------- | --------- | ---------------------------------- |
-| Connection pooling           | Yes       | Via `minconn` / `maxconn`          |
-| Named queries                | Yes       | Stored in dictionary               |
-| Single-row / multi-row fetch | Yes       | `read_row()` / `read_rows()`       |
-| Batch CUD operations         | Yes       | `updates()` returns list of counts |
-| Transactions via `with`      | Yes       | Auto rollback on exception         |
-| Conditional SQL              | Yes       | `#if` / `#elif` / `#endif`         |
-| Bilingual column aliases     | Yes       | `"Name\|이름"` syntax              |
-| SQL injection protection     | Yes       | Strict parsing in conditionals     |
-| Output parameters            | Yes       | Via `params_out` dict              |
+| Feature                      | Supported | Notes                                         |
+| ---------------------------- | --------- | --------------------------------------------- |
+| Connection pooling           | Yes       | Via `minconn` / `maxconn`                     |
+| Named queries                | Yes       | Stored in dictionary                          |
+| Single-row / multi-row fetch | Yes       | `read_row()` / `read_rows()`                  |
+| Batch CUD operations         | Yes       | `updates()` returns list of counts            |
+| Transactions via `with`      | Yes       | Auto rollback on exception                    |
+| Partially return CSV         | Yes       | `read_csv_partial` / `read_csv_partial_async` |
+| Conditional SQL              | Yes       | `#if` / `#elif` / `#endif`                    |
+| Bilingual column aliases     | Yes       | `"Name\|이름"` syntax                         |
+| SQL injection protection     | Yes       | Strict parsing in conditionals                |
+| Output parameters            | Yes       | Via `params_out` dict                         |
 
 ## License
 

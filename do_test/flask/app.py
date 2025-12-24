@@ -1,8 +1,9 @@
 """flask app"""
 
+from datetime import datetime
 import os
 import sys
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, Response
 from dotenv import load_dotenv
 
 # psycopg2_client
@@ -216,6 +217,30 @@ def read_using_en_ko2():
     return get_json(fn_name=read_using_en_ko2.__name__, message=rows)
 
 
+@app.route("/read-csv-partial")
+def read_csv_partial():
+    """read csv partial"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+
+    return Response(
+        db_client.read_csv_partial("read_csv_partial", {}),
+        mimetype="text/csv",
+        headers={
+            # if FE and BE are on different origins, server must expose the Content-Disposition header
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Very important for progressive saving in many browsers
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",  # Important if using nginx
+            "Transfer-Encoding": "chunked",
+        },
+    )
+
+
 @app.route("/use-db-client")
 def use_db_client():
     """use inherited class to not use db_settings every time"""
@@ -225,6 +250,3 @@ def use_db_client():
 
     # RealDictRow({'user_id': 'gildong.hong'})
     return get_json(fn_name=use_db_client.__name__, message=row)
-
-
-# flask --app .\do_test\flask\app.py run --debug

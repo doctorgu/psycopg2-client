@@ -36,3 +36,17 @@ WHERE   user_id = %(user_id)s
 """
     }
 )
+
+qry_dic.update(
+    {
+        "read_csv_partial": """
+SELECT	row_number() OVER (ORDER BY 1) rnum,
+		TO_CHAR(generate_series, 'YYYY년 MM월 DD일') each_day
+FROM	generate_series(
+            '2023-01-01'::timestamp,
+            '2025-12-31'::timestamp,
+            '1 day'::interval
+        )
+"""
+    }
+)
