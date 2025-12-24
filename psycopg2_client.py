@@ -6,7 +6,7 @@ import io
 import atexit
 import json
 import re
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Literal
 import humps
 from psycopg2 import pool, sql
 from psycopg2.extras import RealDictCursor, RealDictRow
@@ -175,12 +175,22 @@ class Psycopg2Client:
 
             qry_type_params_list[i] = (qry_type, params, params_out)
 
-    def _get_query_by_qry_type(self, qry_type: str, en: bool = None) -> str:
+    def _get_query_by_qry_type(
+        self,
+        qry_type: str,
+        func_type: Literal["update", "read", "csv"],
+        en: bool = None,
+    ) -> str:
         query = qry_dic.get(qry_type)
         if not query:
             raise KeyError(f"{qry_type} not exists")
 
-        return f"/* {qry_type} {en} */{query}"
+        info = {
+            "qry_type": qry_type,
+            "func_type": func_type,
+            "en": en,
+        }
+        return f"/* {json.dumps(info, ensure_ascii=False)} */{query}"
 
     def read_rows(
         self,
@@ -215,7 +225,7 @@ class Psycopg2Client:
             if not isinstance(params, dict):
                 params = vars(params)
 
-            qry_str = self._get_query_by_qry_type(qry_type, en)
+            qry_str = self._get_query_by_qry_type(qry_type, "read", en)
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -320,7 +330,7 @@ class Psycopg2Client:
                 params = vars(params)
 
             cursor_name = "cur_partial"
-            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, en)}"
+            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, "csv", en)}"
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -404,7 +414,7 @@ class Psycopg2Client:
             for item in qry_type_params_list:
                 qry_type, params, params_out = item
 
-                qry_str = self._get_query_by_qry_type(qry_type)
+                qry_str = self._get_query_by_qry_type(qry_type, "update")
                 if not qry_str:
                     raise KeyError(f"{qry_type} not exists")
                 if self.db_settings.use_conditional and "#if" in qry_str:

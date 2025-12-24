@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Flask API Test</title>
+    <style>
+      .container {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+    <script>
+      async function callApi() {
+        const apis = [
+          "/create-tables",
+          "/upsert-user",
+          "/upsert-user-params-out",
+          "/upsert-user-list",
+          "/upsert-delete-user-with",
+          "/read-user-one-row",
+          "/read-user-all-rows",
+          "/read-using-conditional1",
+          "/read-using-conditional2",
+          "/read-using-en-ko1",
+          "/read-using-en-ko2",
+          "/use-db-client",
+        ];
+
+        const rets = [];
+        for (const api of apis) {
+          const url = `http://127.0.0.1:5000${api}`;
+          const response = await fetch(url, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          const ret = await response.json();
+          rets.push(JSON.stringify(ret));
+        }
+        document.getElementById("result").value = rets.join("\n");
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <a href="javascript:callApi()">API call</a>
+      <textarea id="result" placeholder="result" rows="15"></textarea>
+    </div>
+  </body>
+</html>

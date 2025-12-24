@@ -1,17 +1,19 @@
-"""db_client_test"""
+"""flask app"""
 
 import os
 import sys
-import json
+from flask import Flask, jsonify, render_template
 from dotenv import load_dotenv
 
 # psycopg2_client
 sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
 
 # pylint: disable=wrong-import-position
-from db_client import DbClient
 from psycopg2_client import Psycopg2Client
 from psycopg2_client_settings import Psycopg2ClientSettings
+from do_test.flask.db_client import DbClient
+
+app = Flask(__name__)
 
 load_dotenv()
 
@@ -29,13 +31,30 @@ db_settings = Psycopg2ClientSettings(
 )
 
 
+def get_json(
+    *, fn_name: str, message: str | int | dict | list[str] | list[int] | list[dict]
+):
+    """return json"""
+    return jsonify({"fn_name": fn_name, "message": message})
+
+
+@app.route("/")
+def home():
+    """home"""
+
+    return render_template("index.html")
+
+
+@app.route("/create-tables")
 def create_tables():
     """create tables"""
 
     db_client = Psycopg2Client(db_settings=db_settings)
     db_client.update("create_tables", {})
+    return get_json(fn_name=create_tables.__name__, message="table created")
 
 
+@app.route("/upsert-user")
 def upsert_user():
     """upsert user"""
 
@@ -46,9 +65,12 @@ def upsert_user():
     )
 
     # affected row count: 1
-    print(upsert_user.__name__, "affected row count:", row_count)
+    return get_json(
+        fn_name=upsert_user.__name__, message=f"affected row count: {row_count}"
+    )
 
 
+@app.route("/upsert-user-params-out")
 def upsert_user_params_out():
     """upsert user and get parameters"""
 
@@ -60,13 +82,13 @@ def upsert_user_params_out():
     )
 
     # user_name after update: 홍길동
-    print(
-        upsert_user_params_out.__name__,
-        "user_name after update:",
-        params_out["user_name"],
+    return get_json(
+        fn_name=upsert_user_params_out.__name__,
+        message=f'user_name after update: {params_out["user_name"]}',
     )
 
 
+@app.route("/upsert-user-list")
 def upsert_user_list():
     """upsert user list (one transaction)"""
 
@@ -79,9 +101,10 @@ def upsert_user_list():
     row_counts = db_client.updates(qry_list)
 
     # [1, 1]
-    print(upsert_user_list.__name__, row_counts)
+    return get_json(fn_name=upsert_user_list.__name__, message=row_counts)
 
 
+@app.route("/upsert-delete-user-with")
 def upsert_delete_user_with():
     """upsert user and delete in with (one transaction)"""
 
@@ -93,9 +116,13 @@ def upsert_delete_user_with():
         row_count = db_client.update("delete_user", {"user_id": id_})
 
         # affected row count: 1
-        print(upsert_delete_user_with.__name__, "affected row count:", row_count)
+        return get_json(
+            fn_name=upsert_delete_user_with.__name__,
+            message=f"affected row count: {row_count}",
+        )
 
 
+@app.route("/read-user-one-row")
 def read_user_one_row():
     """read first one row"""
 
@@ -104,9 +131,10 @@ def read_user_one_row():
     row = db_client.read_row("read_user_id_all", {})
 
     # RealDictRow({'user_id': 'gildong.hong'})
-    print(read_user_one_row.__name__, row)
+    return get_json(fn_name=read_user_one_row.__name__, message=row)
 
 
+@app.route("/read-user-all-rows")
 def read_user_all_rows():
     """read all rows"""
 
@@ -119,11 +147,12 @@ def read_user_all_rows():
     #   RealDictRow({'user_id': 'sunja.kim'}),
     #   RealDictRow({'user_id': 'malja.kim'})
     # ]
-    print(read_user_all_rows.__name__, rows)
+    return get_json(fn_name=read_user_all_rows.__name__, message=rows)
 
 
-def read_using_conditional():
-    """read using conditional (#if #elif #endif)"""
+@app.route("/read-using-conditional1")
+def read_using_conditional1():
+    """read using conditional 1 (#if #elif #endif)"""
 
     db_client = Psycopg2Client(db_settings=db_settings)
 
@@ -135,7 +164,17 @@ def read_using_conditional():
         "read_user_search", {"user_id": "gildong.hong", "user_name": ""}
     )
     # ['홍길동']
-    print(read_using_conditional.__name__, [row["user_name"] for row in rows])
+    return get_json(
+        fn_name=read_using_conditional1.__name__,
+        message=[row["user_name"] for row in rows],
+    )
+
+
+@app.route("/read-using-conditional2")
+def read_using_conditional2():
+    """read using conditional 2 (#if #elif #endif)"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
 
     # SELECT  user_id, user_name, insert_time, update_time
     # FROM    t_user
@@ -143,10 +182,14 @@ def read_using_conditional():
     #         AND user_name ILIKE %(user_name)s
     rows = db_client.read_rows("read_user_search", {"user_id": "", "user_name": "%김%"})
     # ['김순자', '김말자']
-    print(read_using_conditional.__name__, [row["user_name"] for row in rows])
+    return get_json(
+        fn_name=read_using_conditional2.__name__,
+        message=[row["user_name"] for row in rows],
+    )
 
 
-def read_using_en_ko():
+@app.route("/read-using-en-ko1")
+def read_using_en_ko1():
     """set column user_name by en variable"""
 
     db_client = Psycopg2Client(db_settings=db_settings)
@@ -156,16 +199,24 @@ def read_using_en_ko():
     # WHERE   user_id = %(user_id)s
     rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
     # [{"Id": "gildong.hong", "Name": "홍길동"}]
-    print(read_using_en_ko.__name__, json.dumps(rows, ensure_ascii=False))
+    return get_json(fn_name=read_using_en_ko1.__name__, message=rows)
+
+
+@app.route("/read-using-en-ko2")
+def read_using_en_ko2():
+    """set column user_name by en variable"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
 
     # SELECT  user_id "아이디", user_name "이름"
     # FROM    t_user
     # WHERE   user_id = %(user_id)s
     rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
     # [{"아이디": "gildong.hong", "이름": "홍길동"}]
-    print(read_using_en_ko.__name__, json.dumps(rows, ensure_ascii=False))
+    return get_json(fn_name=read_using_en_ko2.__name__, message=rows)
 
 
+@app.route("/use-db-client")
 def use_db_client():
     """use inherited class to not use db_settings every time"""
 
@@ -173,16 +224,7 @@ def use_db_client():
     row = db_client.read_row("read_user_id_all", {})
 
     # RealDictRow({'user_id': 'gildong.hong'})
-    print(use_db_client.__name__, row)
+    return get_json(fn_name=use_db_client.__name__, message=row)
 
 
-create_tables()
-upsert_user()
-upsert_user_params_out()
-upsert_user_list()
-upsert_delete_user_with()
-read_user_one_row()
-read_user_all_rows()
-read_using_conditional()
-read_using_en_ko()
-use_db_client()
+# flask --app .\do_test\flask\app.py run --debug

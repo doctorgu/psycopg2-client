@@ -5,21 +5,21 @@ import re
 from datetime import datetime
 from typing import Callable
 
-from test.mock_data.data_mock_model import (
+from do_test.pytest.mock_data.data_mock_model import (
     ReadRowsMock,
     UpdatesMock,
 )
-from test.mock_data.data_read import (
+from do_test.pytest.mock_data.data_read import (
     rows_list as rows_read,
     out_list as out_read,
 )
-from test.mock_data.data_update import (
-    rows_list as rows_write,
-    out_list as out_write,
+from do_test.pytest.mock_data.data_update import (
+    rows_list as rows_update,
+    out_list as out_update,
 )
 
-rows_combined = rows_read + rows_write
-out_combined = out_read + out_write
+rows_combined = rows_read + rows_update
+out_combined = out_read + out_update
 
 
 def convert_type_dict(item: dict) -> dict:
@@ -167,7 +167,8 @@ def get_rows_by_params(qry_type: str, params: dict, en: bool = None) -> list[dic
         description = f"{qry_type} not exists in rows_list: {[item.qry_type for item in rows_list]}"
     else:
         description = (
-            f"Not found by {qry_type} and {json.dumps(params, default=str, ensure_ascii=False)} and en:{en}"
+            f"Not found by {qry_type}"
+            f" and {json.dumps(params, default=str, ensure_ascii=False)} and en:{en}"
             f"\nCandidate: {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
         )
     raise ValueError(description)

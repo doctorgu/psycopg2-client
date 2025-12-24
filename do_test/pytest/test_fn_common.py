@@ -1,11 +1,15 @@
 """common function for all datalake test"""
 
+import json
+import re
 from typing import Literal
 from psycopg2 import pool, sql
 from mock_data.data_all import (
     get_rows_by_params,
     get_out_by_params,
 )
+
+type FuncType = Literal["update", "read", "csv"]
 
 
 def patch_psycopg2(mocker):
@@ -14,47 +18,61 @@ def patch_psycopg2(mocker):
     class CursorMock:
         """CursorMock"""
 
-        qry_str: str
-        params: dict[str, any]
-        qry_type: str
-        method_type: Literal["update", "read", "csv"]
-        en: bool = None
+        def __init__(self):
+            self.qry_str = ""
+            self.qry_type = ""
+            self.func_type: FuncType = "read"
+            self.params: dict[str, any] = {}
+            self.en: bool = None
 
-        rows: list[dict]
-        row: dict
-        row_count: int
-        _first_fetch_csv: bool = True
+            self.rows: list[dict] = []
+            self.row: dict = {}
+            self.rowcount: int = 0
+            self._first_fetch_csv: bool = True
 
         def execute(self, qry_str: str, params: dict[str, any]):
             """execute"""
+
+            def get_header() -> dict[Literal["qry_type", "func_type", "en"], any]:
+                ret = re.match(r"/\*(.+)\*/", qry_str)
+                if not ret:
+                    raise ValueError("no header in query")
+
+                header = ret.group(1)
+                info = json.loads(header)
+                return info
+
+            def set_test_info(
+                qry_type: str,
+                func_type: FuncType,
+                en: bool = None,
+            ):
+                """set info for test only"""
+
+                self.qry_type = qry_type
+                self.func_type = func_type
+                self.en = en
+                if func_type in ("read", "csv"):
+                    rows = get_rows_by_params(self.qry_type, self.params, self.en)
+                    row = rows[0] if rows else None
+                    self.rows = rows
+                    self.row = row
+                elif func_type == "update":
+                    params_out, row_count = get_out_by_params(
+                        self.qry_type, self.params
+                    )
+                    self.row = params_out
+                    self.rowcount = row_count
+
             self.qry_str = qry_str
             self.params = params
 
-        def set_test_info(
-            self,
-            qry_type: str,
-            method_type: Literal["update", "read", "csv"],
-            *,
-            en: bool = None,
-        ):
-            """set info for test only"""
-
-            self.qry_type = qry_type
-            self.method_type = method_type
-            self.en = en
-            if method_type in ("read", "csv"):
-                rows = get_rows_by_params(self.qry_type, self.params, self.en)
-                row = rows[0] if rows else None
-                self.rows = rows
-                self.row = row
-            elif method_type == "update":
-                params_out, row_count = get_out_by_params(self.qry_type, self.params)
-                self.row = params_out
-                self.row_count = row_count
+            header = get_header()
+            set_test_info(header["qry_type"], header["func_type"], header["en"])
 
         def fetchall(self) -> list[dict]:
             """return rows"""
-            if self.method_type == "csv":
+            if self.func_type == "csv":
                 if self._first_fetch_csv:
                     self._first_fetch_csv = False
                     return self.rows
@@ -65,7 +83,7 @@ def patch_psycopg2(mocker):
 
         def fetchone(self) -> dict | None:
             """return row"""
-            if self.method_type == "csv":
+            if self.func_type == "csv":
                 if self._first_fetch_csv:
                     self._first_fetch_csv = False
                     return self.row
@@ -73,10 +91,6 @@ def patch_psycopg2(mocker):
                     return None
 
             return self.row
-
-        def rowcount(self):
-            """return row count"""
-            return self.row_count
 
         def close(self):
             """close"""
@@ -162,9 +176,3 @@ def patch_psycopg2(mocker):
 
     sql_mock = SqlMock()
     mocker.patch.object(sql, "SQL", side_effect=sql_mock.SQL)
-
-
-def patch_all(mocker):
-    """patch functions of object"""
-
-    patch_psycopg2(mocker)
