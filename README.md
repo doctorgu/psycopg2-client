@@ -330,19 +330,19 @@ Any attempt to inject raw SQL will raise a parsing error **before** execution.
 
 ## Features Summary
 
-| Feature                      | Notes                                         |
-| ---------------------------- | --------------------------------------------- |
-| Connection pooling           | Via `minconn` / `maxconn`                     |
-| Named queries                | Stored in dictionary                          |
-| Single-row / multi-row fetch | `read_row()` / `read_rows()`                  |
-| Batch CUD operations         | `updates()` returns list of counts            |
-| Transactions via `with`      | Auto rollback on exception                    |
-| Partially return CSV         | `read_csv_partial` / `read_csv_partial_async` |
-| Bilingual column aliases     | `"Name\|이름"` syntax                         |
-| Conditional SQL              | `#if` / `#elif` / `#endif`                    |
-| SQL injection protection     | Strict parsing in conditionals                |
-| Logging support              | Before and after execute                      |
-| Output parameters            | Via `params_out` dict                         |
+| Feature                       | Notes                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Connection pooling            | Via `minconn` / `maxconn`                                                       |
+| Named queries                 | Stored in dictionary                                                            |
+| Single-row / multi-row fetch  | `read_row()` / `read_rows()`                                                    |
+| Single / batch CUD operations | `update()` / `updates()`                                                        |
+| Output parameters             | Via `params_out` dict                                                           |
+| Transactions via `with`       | Auto rollback on exception                                                      |
+| Partially return CSV          | `read_csv_partial` / `read_csv_partial_async`                                   |
+| Bilingual column aliases      | `"Name\|이름"` syntax                                                           |
+| Conditional SQL               | `#if` / `#elif` / `#endif`                                                      |
+| Logging support               | Before and after execute to DB via `before...` and `after...` callable function |
+| SQL injection protection      | Strict parsing in conditionals                                                  |
 
 ## License
 
