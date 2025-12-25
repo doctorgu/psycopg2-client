@@ -341,6 +341,7 @@ Any attempt to inject raw SQL will raise a parsing error **before** execution.
 | Bilingual column aliases     | `"Name\|이름"` syntax                         |
 | Conditional SQL              | `#if` / `#elif` / `#endif`                    |
 | SQL injection protection     | Strict parsing in conditionals                |
+| Logging support              | Before and after execute                      |
 | Output parameters            | Via `params_out` dict                         |
 
 ## License
