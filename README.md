@@ -65,6 +65,18 @@ db_settings = Psycopg2ClientSettings(
     connect_timeout=5,
     use_en_ko_column_alias=True,
     use_conditional=True,
+    before_read_execute=lambda qry_type, params, qry_str, qry_with_value: print(
+        f'READ_ROWS_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
+    ),
+    after_read_execute=lambda qry_type, duration: print(
+        f'READ_ROWS_END, QRY_TYPE: "{qry_type}"' f", DURATION: {duration}"
+    ),
+    before_update_execute=lambda qry_type, params, params_out, qry_str, qry_with_value: print(
+        f'UPDATES_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
+    ),
+    after_update_execute=lambda qry_type, row_count, params_out, duration: print(
+        f'UPDATES_END, QRY_TYPE: "{qry_type}"' f", DURATION: {duration}"
+    ),
 )
 ```
 
@@ -75,7 +87,7 @@ db = Psycopg2Client(db_settings=db_settings)
 
 # Read single row
 row = db.read_row("read_user_id_all", {})
-print(row)  # RealDictRow({'user_id': 'gildong.hong'})
+print(row)  # {'user_id': 'gildong.hong'}
 
 # Read all rows
 rows = db.read_rows("read_user_id_all", {})
@@ -149,7 +161,8 @@ def read_csv_partial():
         db_client.read_csv_partial("read_csv_partial", {}),
         mimetype="text/csv",
         headers={
-            # if FE and BE are on different origins, server must expose the Content-Disposition header
+            # if FE and BE are on different origins,
+            # server must expose the Content-Disposition header
             "Access-Control-Expose-Headers": "Content-Disposition",
             "Content-Disposition": f'attachment; filename="{filename}"',
             # Very important for progressive saving in many browsers
@@ -173,7 +186,8 @@ async def read_csv_partial_async():
         content=db_client.read_csv_partial_async("read_csv_partial", {}),
         media_type="text/csv",
         headers={
-            # if FE and BE are on different origins, server must expose the Content-Disposition header
+            # if FE and BE are on different origins,
+            # server must expose the Content-Disposition header
             "Access-Control-Expose-Headers": "Content-Disposition",
             "Content-Disposition": f'attachment; filename="{filename}"',
             # Very important for progressive saving in many browsers
@@ -184,6 +198,39 @@ async def read_csv_partial_async():
             "Transfer-Encoding": "chunked",
         },
     )
+```
+
+## Bilingual Column Aliases (English ↔ Korean)
+
+Enabled when `use_en_ko_column_alias=True` and `en` not ommited
+
+```python
+qry_dic.update(
+    {
+        "read_user_alias": """
+SELECT  user_id "Id|아이디", user_name "Name|이름"
+FROM    t_user
+WHERE   user_id = %(user_id)s
+"""
+    }
+)
+"""
+```
+
+### English mode (`en=True`)
+
+```python
+rows = db.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
+print(rows[0])
+# {'Id': 'gildong.hong', 'Name': '홍길동'}
+```
+
+### Korean mode (`en=False`)
+
+```python
+rows = db.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
+print(rows[0])
+# {'아이디': 'gildong.hong', '이름': '홍길동'}
 ```
 
 ## Conditional SQL (`#if`, `#elif`, `#endif`)
@@ -230,37 +277,35 @@ print([r["user_name"] for r in rows])
 # ['김순자', '김말자']
 ```
 
-## Bilingual Column Aliases (English ↔ Korean)
+## Logging support
 
-Enabled when `use_en_ko_column_alias=True`
+- `before_read_execute` called before execute query for read
+- `after_read_execute` called after execute query for read
+- `before_update_execute` called before execute query for CUD
+- `after_update_execute` called after execute query for CUD
+
+Can be replaced `print` with `logger`
+
+### Example: Use logger to write debug info
 
 ```python
-qry_dic.update(
-    {
-        "read_user_alias": """
-SELECT  user_id "Id|아이디", user_name "Name|이름"
-FROM    t_user
-WHERE   user_id = %(user_id)s
-"""
-    }
+import logging
+
+def get_sql_logger(name="sql"):
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        logging.basicConfig(
+            filename="sql.log",
+            level=logging.DEBUG,
+            format="%(asctime)s [%(levelname)7s] %(message)s",
+            encoding="utf-8"
+        )
+    return logger
+
+logger = get_sql_logger()
+db_settings.before_read_execute = lambda qry_type, params, qry_str, qry_with_value: logger.debug(
+    f'READ_ROWS_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
 )
-"""
-```
-
-### English mode (`en=True`)
-
-```python
-rows = db.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
-print(rows[0])
-# {'Id': 'gildong.hong', 'Name': '홍길동'}
-```
-
-### Korean mode (`en=False` or omitted)
-
-```python
-rows = db.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
-print(rows[0])
-# {'아이디': 'gildong.hong', '이름': '홍길동'}
 ```
 
 ## Safety & Security
@@ -285,18 +330,18 @@ Any attempt to inject raw SQL will raise a parsing error **before** execution.
 
 ## Features Summary
 
-| Feature                      | Supported | Notes                                         |
-| ---------------------------- | --------- | --------------------------------------------- |
-| Connection pooling           | Yes       | Via `minconn` / `maxconn`                     |
-| Named queries                | Yes       | Stored in dictionary                          |
-| Single-row / multi-row fetch | Yes       | `read_row()` / `read_rows()`                  |
-| Batch CUD operations         | Yes       | `updates()` returns list of counts            |
-| Transactions via `with`      | Yes       | Auto rollback on exception                    |
-| Partially return CSV         | Yes       | `read_csv_partial` / `read_csv_partial_async` |
-| Conditional SQL              | Yes       | `#if` / `#elif` / `#endif`                    |
-| Bilingual column aliases     | Yes       | `"Name\|이름"` syntax                         |
-| SQL injection protection     | Yes       | Strict parsing in conditionals                |
-| Output parameters            | Yes       | Via `params_out` dict                         |
+| Feature                      | Notes                                         |
+| ---------------------------- | --------------------------------------------- |
+| Connection pooling           | Via `minconn` / `maxconn`                     |
+| Named queries                | Stored in dictionary                          |
+| Single-row / multi-row fetch | `read_row()` / `read_rows()`                  |
+| Batch CUD operations         | `updates()` returns list of counts            |
+| Transactions via `with`      | Auto rollback on exception                    |
+| Partially return CSV         | `read_csv_partial` / `read_csv_partial_async` |
+| Bilingual column aliases     | `"Name\|이름"` syntax                         |
+| Conditional SQL              | `#if` / `#elif` / `#endif`                    |
+| SQL injection protection     | Strict parsing in conditionals                |
+| Output parameters            | Via `params_out` dict                         |
 
 ## License
 

@@ -1,16 +1,15 @@
 """database client"""
 
-import asyncio
 import csv
 from datetime import datetime, date
+import time
 import io
 import atexit
 import json
 import re
 from typing import AsyncGenerator, Generator, Literal
-import time
 import humps
-from psycopg2 import pool, sql
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
 
 from psycopg2_client_settings import Psycopg2ClientSettings
@@ -101,14 +100,7 @@ class Psycopg2Client:
 
             self.in_with_block = False
 
-    def _serial(self, obj):
-        """JSON serializer for objects not serializable by default json code"""
-
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        return str(obj)
-
-    def _get_query_with_value(self, qry_str: str, params: dict, conn) -> str:
+    def _get_query_with_value(self, qry_str: str, params: dict) -> str:
         """replace raw query to value filled query"""
 
         def escape_literal(value) -> str:
@@ -125,8 +117,9 @@ class Psycopg2Client:
                 ret = str(value)
             return ret
 
-        query_raw = sql.SQL(qry_str).as_string(conn)
-        query_replaced = query_raw
+        # query_raw = sql.SQL(qry_str).as_string(conn)
+        # query_replaced = query_raw
+        query_replaced = qry_str
         for key, value in params.items():
             find = f"%({key})s"
             if find in query_replaced:
@@ -180,19 +173,30 @@ class Psycopg2Client:
     def _get_query_by_qry_type(
         self,
         qry_type: str,
+        params: dict,
         func_type: Literal["update", "read", "csv"],
         en: bool = None,
     ) -> str:
+        def serial_date(obj):
+            """JSON serializer for objects not serializable by default json code"""
+
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            return str(obj)
+
         query = qry_dic.get(qry_type)
         if not query:
             raise KeyError(f"{qry_type} not exists")
 
         info = {
             "qry_type": qry_type,
+            "params": [{k: v.replace("%", "{{percent}}")} for k, v in params.items()],
             "func_type": func_type,
             "en": en,
         }
-        return f"/* {json.dumps(info, ensure_ascii=False)} */{query}"
+        return (
+            f"/* {json.dumps(info, ensure_ascii=False, default=serial_date)} */{query}"
+        )
 
     def read_rows(
         self,
@@ -227,11 +231,21 @@ class Psycopg2Client:
             if not isinstance(params, dict):
                 params = vars(params)
 
-            qry_str = self._get_query_by_qry_type(qry_type, "read", en)
+            qry_str = self._get_query_by_qry_type(qry_type, params, "read", en)
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
                 qry_str = get_conditional(qry_str, params)
+
+            start = 0
+            if self.db_settings.before_read_execute:
+                self.db_settings.before_read_execute(
+                    qry_type,
+                    params,
+                    qry_str,
+                    self._get_query_with_value(qry_str, params),
+                )
+                start = time.time()
 
             rows: list[RealDictRow] = []
             cursor.execute(qry_str, params)
@@ -242,6 +256,10 @@ class Psycopg2Client:
                 row = cursor.fetchone()
                 if row:
                     rows.append(row)
+
+            if self.db_settings.after_read_execute:
+                duration = int(round((time.time() - start) * 1000))
+                self.db_settings.after_read_execute(qry_type, duration)
 
             if not rows:
                 return rows
@@ -332,7 +350,10 @@ class Psycopg2Client:
                 params = vars(params)
 
             cursor_name = "cur_partial"
-            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, "csv", en)}"
+            qry_str = (
+                f"DECLARE {cursor_name} CURSOR FOR"
+                f" {self._get_query_by_qry_type(qry_type, params, "csv", en)}"
+            )
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -347,8 +368,24 @@ class Psycopg2Client:
 
             cursor.execute(qry_str, params)
             while True:
+                start = 0
+                if not is_second:
+                    if self.db_settings.before_read_execute:
+                        self.db_settings.before_read_execute(
+                            qry_type,
+                            params,
+                            qry_str,
+                            self._get_query_with_value(qry_str, params),
+                        )
+                        start = time.time()
+
                 cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
                 rows = cursor.fetchall()
+
+                if not is_second:
+                    if self.db_settings.after_read_execute:
+                        duration = int(round((time.time() - start) * 1000))
+                        self.db_settings.after_read_execute(qry_type, duration)
 
                 if not rows:
                     break
@@ -420,7 +457,10 @@ class Psycopg2Client:
                 params = vars(params)
 
             cursor_name = "cur_partial"
-            qry_str = f"DECLARE {cursor_name} CURSOR FOR {self._get_query_by_qry_type(qry_type, "csv", en)}"
+            qry_str = (
+                f"DECLARE {cursor_name} CURSOR FOR"
+                f" {self._get_query_by_qry_type(qry_type, params, "csv", en)}"
+            )
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
@@ -435,9 +475,24 @@ class Psycopg2Client:
 
             cursor.execute(qry_str, params)
             while True:
+                start = 0
+                if not is_second:
+                    if self.db_settings.before_read_execute:
+                        self.db_settings.before_read_execute(
+                            qry_type,
+                            params,
+                            qry_str,
+                            self._get_query_with_value(qry_str, params),
+                        )
+                        start = time.time()
+
                 cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
                 rows = cursor.fetchall()
 
+                if not is_second:
+                    if self.db_settings.after_read_execute:
+                        duration = int(round((time.time() - start) * 1000))
+                        self.db_settings.after_read_execute(qry_type, duration)
                 if not rows:
                     break
 
@@ -506,11 +561,22 @@ class Psycopg2Client:
             for item in qry_type_params_list:
                 qry_type, params, params_out = item
 
-                qry_str = self._get_query_by_qry_type(qry_type, "update")
+                qry_str = self._get_query_by_qry_type(qry_type, params, "update")
                 if not qry_str:
                     raise KeyError(f"{qry_type} not exists")
                 if self.db_settings.use_conditional and "#if" in qry_str:
                     qry_str = get_conditional(qry_str, params)
+
+                start = 0
+                if self.db_settings.before_update_execute:
+                    self.db_settings.before_update_execute(
+                        qry_type,
+                        params,
+                        params_out,
+                        qry_str,
+                        self._get_query_with_value(qry_str, params),
+                    )
+                    start = time.time()
 
                 cursor.execute(qry_str, params)
                 row_count = cursor.rowcount
@@ -520,6 +586,12 @@ class Psycopg2Client:
                     for k, v in row.items():
                         if k in params_out:
                             params_out[k] = v
+
+                if self.db_settings.after_update_execute:
+                    duration = int(round((time.time() - start) * 1000))
+                    self.db_settings.after_update_execute(
+                        qry_type, row_count, params_out, duration
+                    )
 
                 row_counts.append(row_count)
                 qry_strs.append(qry_str)

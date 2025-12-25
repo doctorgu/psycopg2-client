@@ -1,32 +1,15 @@
 """db_client_test"""
 
-import os
 import sys
 import json
-from dotenv import load_dotenv
 
 # psycopg2_client
 sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
 
 # pylint: disable=wrong-import-position
-from db_client import DbClient
+from do_test.db_settings import db_settings
+from do_test.db_client import DbClient
 from psycopg2_client import Psycopg2Client
-from psycopg2_client_settings import Psycopg2ClientSettings
-
-load_dotenv()
-
-db_settings = Psycopg2ClientSettings(
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=int(os.getenv("DB_PORT")),
-    database=os.getenv("DB_DATABASE"),
-    user=os.getenv("DB_USER"),
-    minconn=3,
-    maxconn=6,
-    connect_timeout=3,
-    use_en_ko_column_alias=True,
-    use_conditional=True,
-)
 
 
 def create_tables():
@@ -103,7 +86,7 @@ def read_user_one_row():
 
     row = db_client.read_row("read_user_id_all", {})
 
-    # RealDictRow({'user_id': 'gildong.hong'})
+    # {'user_id': 'gildong.hong'}
     print(read_user_one_row.__name__, row)
 
 
@@ -115,11 +98,37 @@ def read_user_all_rows():
     rows = db_client.read_rows("read_user_id_all", {})
 
     # [
-    #   RealDictRow({'user_id': 'gildong.hong'}),
-    #   RealDictRow({'user_id': 'sunja.kim'}),
-    #   RealDictRow({'user_id': 'malja.kim'})
+    #   {'user_id': 'gildong.hong'},
+    #   {'user_id': 'sunja.kim'},
+    #   {'user_id': 'malja.kim'}
     # ]
     print(read_user_all_rows.__name__, rows)
+
+
+def read_using_en_ko1():
+    """set column user_name by en variable"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+
+    # SELECT  user_id "Id", user_name "Name"
+    # FROM    t_user
+    # WHERE   user_id = %(user_id)s
+    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
+    # [{"Id": "gildong.hong", "Name": "홍길동"}]
+    print(read_using_en_ko1.__name__, json.dumps(rows, ensure_ascii=False))
+
+
+def read_using_en_ko2():
+    """set column user_name by en variable"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+
+    # SELECT  user_id "아이디", user_name "이름"
+    # FROM    t_user
+    # WHERE   user_id = %(user_id)s
+    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
+    # [{"아이디": "gildong.hong", "이름": "홍길동"}]
+    print(read_using_en_ko2.__name__, json.dumps(rows, ensure_ascii=False))
 
 
 def read_using_conditional1():
@@ -152,39 +161,13 @@ def read_using_conditional2():
     print(read_using_conditional2.__name__, [row["user_name"] for row in rows])
 
 
-def read_using_en_ko1():
-    """set column user_name by en variable"""
-
-    db_client = Psycopg2Client(db_settings=db_settings)
-
-    # SELECT  user_id "Id", user_name "Name"
-    # FROM    t_user
-    # WHERE   user_id = %(user_id)s
-    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
-    # [{"Id": "gildong.hong", "Name": "홍길동"}]
-    print(read_using_en_ko1.__name__, json.dumps(rows, ensure_ascii=False))
-
-
-def read_using_en_ko2():
-    """set column user_name by en variable"""
-
-    db_client = Psycopg2Client(db_settings=db_settings)
-
-    # SELECT  user_id "아이디", user_name "이름"
-    # FROM    t_user
-    # WHERE   user_id = %(user_id)s
-    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
-    # [{"아이디": "gildong.hong", "이름": "홍길동"}]
-    print(read_using_en_ko2.__name__, json.dumps(rows, ensure_ascii=False))
-
-
 def use_db_client():
     """use inherited class to not use db_settings every time"""
 
     db_client = DbClient()
     row = db_client.read_row("read_user_id_all", {})
 
-    # RealDictRow({'user_id': 'gildong.hong'})
+    # {"user_id": "gildong.hong"}
     print(use_db_client.__name__, row)
 
 

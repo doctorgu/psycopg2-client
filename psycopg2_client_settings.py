@@ -1,6 +1,7 @@
 """db_client_settings"""
 
 from dataclasses import dataclass
+from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -29,16 +30,22 @@ class Psycopg2ClientSettings:
     #endif
     """
 
-
-# db_settings = Psycopg2ClientSettings(
-#     password="0000",
-#     host="127.0.0.1",
-#     port=5432,
-#     database="postgres",
-#     user="postgres",
-#     minconn=3,
-#     maxconn=6,
-#     connect_timeout=3,
-#     use_en_ko_column_alias=True,
-#     use_conditional=True,
-# )
+    before_read_execute: Callable[[str, dict, str, str], None] = None
+    """
+    qry_type: str, params: dict, qry_str: str, qry_with_value: str
+    """
+    after_read_execute: Callable[[str, int], None] = None
+    """
+    qry_type: str, duration: int
+    """
+    before_update_execute: Callable[
+        [str, dict, dict, str, str],
+        None,
+    ] = None
+    """
+    qry_type: str, params: dict, params_out: dict, qry_str: str, qry_with_value: str
+    """
+    after_update_execute: Callable[[str, int, dict, int], None] = None
+    """
+    qry_type: str, row_count: int, params_out: dict, duration: int
+    """

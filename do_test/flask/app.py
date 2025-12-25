@@ -1,35 +1,18 @@
 """flask app"""
 
 from datetime import datetime
-import os
 import sys
 from flask import Flask, jsonify, render_template, Response
-from dotenv import load_dotenv
 
 # psycopg2_client
 sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
 
 # pylint: disable=wrong-import-position
+from do_test.db_settings import db_settings
+from do_test.db_client import DbClient
 from psycopg2_client import Psycopg2Client
-from psycopg2_client_settings import Psycopg2ClientSettings
-from do_test.flask.db_client import DbClient
 
 app = Flask(__name__)
-
-load_dotenv()
-
-db_settings = Psycopg2ClientSettings(
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=int(os.getenv("DB_PORT")),
-    database=os.getenv("DB_DATABASE"),
-    user=os.getenv("DB_USER"),
-    minconn=3,
-    maxconn=6,
-    connect_timeout=3,
-    use_en_ko_column_alias=True,
-    use_conditional=True,
-)
 
 
 def get_json(
@@ -131,7 +114,7 @@ def read_user_one_row():
 
     row = db_client.read_row("read_user_id_all", {})
 
-    # RealDictRow({'user_id': 'gildong.hong'})
+    # {'user_id': 'gildong.hong'}
     return get_json(fn_name=read_user_one_row.__name__, message=row)
 
 
@@ -144,11 +127,64 @@ def read_user_all_rows():
     rows = db_client.read_rows("read_user_id_all", {})
 
     # [
-    #   RealDictRow({'user_id': 'gildong.hong'}),
-    #   RealDictRow({'user_id': 'sunja.kim'}),
-    #   RealDictRow({'user_id': 'malja.kim'})
+    #   {'user_id': 'gildong.hong'},
+    #   {'user_id': 'sunja.kim'},
+    #   {'user_id': 'malja.kim'}
     # ]
     return get_json(fn_name=read_user_all_rows.__name__, message=rows)
+
+
+@app.route("/read-csv-partial")
+def read_csv_partial():
+    """read csv partial"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+
+    return Response(
+        db_client.read_csv_partial("read_csv_partial", {}),
+        mimetype="text/csv",
+        headers={
+            # if FE and BE are on different origins,
+            # server must expose the Content-Disposition header
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Very important for progressive saving in many browsers
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",  # Important if using nginx
+            "Transfer-Encoding": "chunked",
+        },
+    )
+
+
+@app.route("/read-using-en-ko1")
+def read_using_en_ko1():
+    """set column user_name by en variable"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+
+    # SELECT  user_id "Id", user_name "Name"
+    # FROM    t_user
+    # WHERE   user_id = %(user_id)s
+    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
+    # [{"Id": "gildong.hong", "Name": "홍길동"}]
+    return get_json(fn_name=read_using_en_ko1.__name__, message=rows)
+
+
+@app.route("/read-using-en-ko2")
+def read_using_en_ko2():
+    """set column user_name by en variable"""
+
+    db_client = Psycopg2Client(db_settings=db_settings)
+
+    # SELECT  user_id "아이디", user_name "이름"
+    # FROM    t_user
+    # WHERE   user_id = %(user_id)s
+    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
+    # [{"아이디": "gildong.hong", "이름": "홍길동"}]
+    return get_json(fn_name=read_using_en_ko2.__name__, message=rows)
 
 
 @app.route("/read-using-conditional1")
@@ -189,58 +225,6 @@ def read_using_conditional2():
     )
 
 
-@app.route("/read-using-en-ko1")
-def read_using_en_ko1():
-    """set column user_name by en variable"""
-
-    db_client = Psycopg2Client(db_settings=db_settings)
-
-    # SELECT  user_id "Id", user_name "Name"
-    # FROM    t_user
-    # WHERE   user_id = %(user_id)s
-    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=True)
-    # [{"Id": "gildong.hong", "Name": "홍길동"}]
-    return get_json(fn_name=read_using_en_ko1.__name__, message=rows)
-
-
-@app.route("/read-using-en-ko2")
-def read_using_en_ko2():
-    """set column user_name by en variable"""
-
-    db_client = Psycopg2Client(db_settings=db_settings)
-
-    # SELECT  user_id "아이디", user_name "이름"
-    # FROM    t_user
-    # WHERE   user_id = %(user_id)s
-    rows = db_client.read_rows("read_user_alias", {"user_id": "gildong.hong"}, en=False)
-    # [{"아이디": "gildong.hong", "이름": "홍길동"}]
-    return get_json(fn_name=read_using_en_ko2.__name__, message=rows)
-
-
-@app.route("/read-csv-partial")
-def read_csv_partial():
-    """read csv partial"""
-
-    db_client = Psycopg2Client(db_settings=db_settings)
-    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
-
-    return Response(
-        db_client.read_csv_partial("read_csv_partial", {}),
-        mimetype="text/csv",
-        headers={
-            # if FE and BE are on different origins, server must expose the Content-Disposition header
-            "Access-Control-Expose-Headers": "Content-Disposition",
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            # Very important for progressive saving in many browsers
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "X-Accel-Buffering": "no",  # Important if using nginx
-            "Transfer-Encoding": "chunked",
-        },
-    )
-
-
 @app.route("/use-db-client")
 def use_db_client():
     """use inherited class to not use db_settings every time"""
@@ -248,5 +232,8 @@ def use_db_client():
     db_client = DbClient()
     row = db_client.read_row("read_user_id_all", {})
 
-    # RealDictRow({'user_id': 'gildong.hong'})
+    # {"user_id": "gildong.hong"}
     return get_json(fn_name=use_db_client.__name__, message=row)
+
+
+# flask --app .\do_test\flask\app.py run --debug
