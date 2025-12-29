@@ -65,7 +65,6 @@ class Psycopg2Client:
         global db_set_and_pool
 
         self.conn = None
-        self.cursor = None
         self.in_with_block = False
         self.db_settings = db_settings
         self.query_recent = ""
@@ -77,7 +76,6 @@ class Psycopg2Client:
     def __enter__(self):
         # Called when entering the 'with' block
         self.conn = Psycopg2Client._conn_pool.getconn()
-        self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         self.in_with_block = True
         return self
 
@@ -91,9 +89,6 @@ class Psycopg2Client:
                 # Exception occurred, rollback the transaction
                 self.conn.rollback()
         finally:
-            if self.cursor:
-                self.cursor.close()
-                self.cursor = None
             if self.conn:
                 self._conn_pool.putconn(self.conn)
                 self.conn = None
@@ -270,13 +265,14 @@ class Psycopg2Client:
 
         rows: list[RealDictRow] = []
         if self.in_with_block:
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             rows = read_rows_by_param(
                 qry_type,
                 params,
                 camelize=camelize,
                 en=en,
                 fetchone=fetchone,
-                cursor=self.cursor,
+                cursor=cursor,
             )
         else:
             conn_pool = Psycopg2Client._conn_pool
@@ -359,7 +355,7 @@ class Psycopg2Client:
             if self.db_settings.use_conditional and "#if" in qry_str:
                 qry_str = get_conditional(qry_str, params)
 
-            rows: list[RealDictRow] = []
+            rows: list[tuple] = []
             is_second = False
 
             # without  UTF-8 BOM, hangul will be broken.
@@ -391,9 +387,10 @@ class Psycopg2Client:
                     break
 
                 csv_out = io.StringIO()
-                csv_w = csv.DictWriter(csv_out, rows[0].keys())
+                csv_w = csv.writer(csv_out)
                 if not is_second:
-                    csv_w.writeheader()
+                    column_names = [desc[0] for desc in cursor.description]
+                    csv_w.writerow(column_names)
                 csv_w.writerows(rows)
 
                 yield csv_out.getvalue().encode("utf-8")
@@ -401,19 +398,20 @@ class Psycopg2Client:
                 is_second = True
 
         if self.in_with_block:
+            cursor = self.conn.cursor()  # default cursor_factory is tuple
             async for value in read_csv_partial_async_by_param(
                 qry_type,
                 params,
                 row_count_partial=row_count_partial,
                 en=en,
-                cursor=self.cursor,
+                cursor=cursor,
             ):
                 yield value
         else:
             conn_pool = Psycopg2Client._conn_pool
             try:
                 conn = conn_pool.getconn()
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                cursor = conn.cursor()  # default cursor_factory is tuple
                 async for value in read_csv_partial_async_by_param(
                     qry_type,
                     params,
@@ -497,9 +495,10 @@ class Psycopg2Client:
                     break
 
                 csv_out = io.StringIO()
-                csv_w = csv.DictWriter(csv_out, rows[0].keys())
+                csv_w = csv.writer(csv_out)
                 if not is_second:
-                    csv_w.writeheader()
+                    column_names = [desc[0] for desc in cursor.description]
+                    csv_w.writerow(column_names)
                 csv_w.writerows(rows)
 
                 yield csv_out.getvalue().encode("utf-8")
@@ -507,27 +506,26 @@ class Psycopg2Client:
                 is_second = True
 
         if self.in_with_block:
-            for value in read_csv_partial_by_param(
+            cursor = self.conn.cursor()  # default cursor_factory is tuple
+            yield from read_csv_partial_by_param(
                 qry_type,
                 params,
                 row_count_partial=row_count_partial,
                 en=en,
-                cursor=self.cursor,
-            ):
-                yield value
+                cursor=cursor,
+            )
         else:
             conn_pool = Psycopg2Client._conn_pool
             try:
                 conn = conn_pool.getconn()
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
-                for value in read_csv_partial_by_param(
+                cursor = conn.cursor()  # default cursor_factory is tuple
+                yield from read_csv_partial_by_param(
                     qry_type,
                     params,
                     row_count_partial=row_count_partial,
                     en=en,
                     cursor=cursor,
-                ):
-                    yield value
+                )
             finally:
                 cursor.close()
                 conn_pool.putconn(conn)
@@ -600,7 +598,8 @@ class Psycopg2Client:
 
         row_counts: list[int] = []
         if self.in_with_block:
-            row_counts = updates_by_param(qry_type_params_list, self.cursor)
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            row_counts = updates_by_param(qry_type_params_list, cursor)
         else:
             conn_pool = Psycopg2Client._conn_pool
             try:
