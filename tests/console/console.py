@@ -3,12 +3,12 @@
 import sys
 import json
 
-# psycopg2_client
-sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
+# psycopg2-client
+sys.path.append(__file__[0 : __file__.find("psycopg2-client") + len("psycopg2-client")])
 
 # pylint: disable=wrong-import-position
-from do_test.db_settings import db_settings
-from do_test.db_client import DbClient
+from tests.db_settings import db_settings
+from tests.db_client import DbClient
 from psycopg2_client import Psycopg2Client
 
 
@@ -184,4 +184,4 @@ read_using_en_ko1()
 read_using_en_ko2()
 use_db_client()
 
-# python do_test/console/console.py
+# python tests/console/console.py

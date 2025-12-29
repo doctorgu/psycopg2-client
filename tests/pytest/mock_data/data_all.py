@@ -5,15 +5,15 @@ import re
 from datetime import datetime
 from typing import Callable
 
-from do_test.pytest.mock_data.data_mock_model import (
+from tests.pytest.mock_data.data_mock_model import (
     ReadRowsMock,
     UpdatesMock,
 )
-from do_test.pytest.mock_data.data_read import (
+from tests.pytest.mock_data.data_read import (
     rows_list as rows_read,
     out_list as out_read,
 )
-from do_test.pytest.mock_data.data_update import (
+from tests.pytest.mock_data.data_update import (
     rows_list as rows_update,
     out_list as out_update,
 )

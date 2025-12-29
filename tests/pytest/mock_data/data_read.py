@@ -1,6 +1,6 @@
 """mock data for common"""
 
-from do_test.pytest.mock_data.data_mock_model import (
+from tests.pytest.mock_data.data_mock_model import (
     ReadRowsMock,
     UpdatesMock,
 )

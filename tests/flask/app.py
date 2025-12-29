@@ -4,12 +4,12 @@ from datetime import datetime
 import sys
 from flask import Flask, jsonify, render_template, Response
 
-# psycopg2_client
-sys.path.append(__file__[0 : __file__.find("psycopg2_client") + len("psycopg2_client")])
+# psycopg2-client
+sys.path.append(__file__[0 : __file__.find("psycopg2-client") + len("psycopg2-client")])
 
 # pylint: disable=wrong-import-position
-from do_test.db_settings import db_settings
-from do_test.db_client import DbClient
+from tests.db_settings import db_settings
+from tests.db_client import DbClient
 from psycopg2_client import Psycopg2Client
 
 app = Flask(__name__)
@@ -236,4 +236,4 @@ def use_db_client():
     return get_json(fn_name=use_db_client.__name__, message=row)
 
 
-# flask --app .\do_test\flask\app.py run --debug
+# flask --app .\tests\flask\app.py run --debug

@@ -13,10 +13,10 @@ A lightweight, opinionated wrapper around **psycopg2** with built-in support for
 ## Installation
 
 ```bash
-pip install psycopg2-binary
+pip install psycopg2-client
 ```
 
-> Note: `Psycopg2Client` is a custom helper class (not on PyPI). See full source in repository.
+> Note: `psycopg2-client` is a custom helper class. See full source in repository.
 
 ## Quick Start
 

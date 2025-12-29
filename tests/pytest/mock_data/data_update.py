@@ -1,6 +1,6 @@
 """mock data for bucket"""
 
-from do_test.pytest.mock_data.data_mock_model import ReadRowsMock, UpdatesMock
+from tests.pytest.mock_data.data_mock_model import ReadRowsMock, UpdatesMock
 
 rows_list: list[ReadRowsMock] = []
 out_list: list[UpdatesMock] = []
