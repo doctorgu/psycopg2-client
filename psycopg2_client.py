@@ -8,9 +8,9 @@ import atexit
 import json
 import re
 from typing import AsyncGenerator, Generator, Literal
-import humps
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
+from psycopg2.extensions import connection
 
 from psycopg2_client_settings import Psycopg2ClientSettings
 from psycopg2_client_util import get_conditional
@@ -38,11 +38,10 @@ class Psycopg2ClientPool:
         """Close the shared connection pool."""
         if self.conn_pool:
             self.conn_pool.closeall()
-            self.conn_pool = None
 
             print(datetime.now(), self.__class__.__name__, self.__exit__.__name__)
 
-    def getconn(self):
+    def getconn(self) -> connection:
         """return conn_pool"""
         return self.conn_pool.getconn()
 
@@ -58,20 +57,21 @@ class Psycopg2Client:
     """database client"""
 
     # Class-level shared connection pool
-    _conn_pool: pool.ThreadedConnectionPool = None
+    _conn_pool: Psycopg2ClientPool
 
     def __init__(self, db_settings: Psycopg2ClientSettings):
         # pylint:disable=global-statement,global-variable-not-assigned
         global db_set_and_pool
 
-        self.conn = None
+        self.conn: connection
         self.in_with_block = False
         self.db_settings = db_settings
         self.query_recent = ""
 
         if db_settings not in db_set_and_pool:
-            db_set_and_pool[db_settings] = Psycopg2ClientPool(db_settings)
-            Psycopg2Client._conn_pool = db_set_and_pool[db_settings]
+            pool = Psycopg2ClientPool(db_settings)
+            db_set_and_pool[db_settings] = pool
+            Psycopg2Client._conn_pool = pool
 
     def __enter__(self):
         # Called when entering the 'with' block
@@ -91,7 +91,6 @@ class Psycopg2Client:
         finally:
             if self.conn:
                 self._conn_pool.putconn(self.conn)
-                self.conn = None
 
             self.in_with_block = False
 
@@ -145,32 +144,34 @@ class Psycopg2Client:
 
     def _normalize_qry_type_params_list(
         self,
-        qry_type_params_list: list[tuple[str, dict]] | list[tuple[str, dict, dict]],
-    ):
+        qry_type_params_list: list[any], # type: ignore
+    )-> list[tuple[str, dict, dict]]:
         """normalize all item from parameter of Psycopg2Client.updates"""
 
-        for i, item in enumerate(qry_type_params_list):
+        qry_type_params_list_new: list[tuple[str, dict, dict]] = []
+        for item in qry_type_params_list:
             # append params_out if not exists
-            if len(item) == 2:
-                item = (item[0], item[1], {})
+            item_new: tuple[str, dict, dict] = item if len(item) == 3 else (item[0], item[1], {})
 
-            qry_type, params, params_out = item
+            qry_type, params, params_out = item_new
             if not isinstance(params, dict):
-                params = vars(params)
+                params: dict = vars(params)
 
             if params_out is None:
                 params_out = {}
             if not isinstance(params_out, dict):
-                params_out = vars(params_out)
+                params_out: dict = vars(params_out)
 
-            qry_type_params_list[i] = (qry_type, params, params_out)
+            qry_type_params_list_new.append((qry_type, params, params_out))
+
+        return qry_type_params_list_new
 
     def _get_query_by_qry_type(
         self,
         qry_type: str,
         params: dict,
         func_type: Literal["update", "read", "csv"],
-        en: bool = None,
+        en: bool = False,
     ) -> str:
         def serial_date(obj):
             """JSON serializer for objects not serializable by default json code"""
@@ -198,8 +199,7 @@ class Psycopg2Client:
         qry_type: str,
         params: dict,
         *,
-        camelize: bool = False,
-        en: bool = None,
+        en: bool = False,
         fetchone: bool = False,
     ) -> list[RealDictRow]:
         """Returns all rows
@@ -207,8 +207,6 @@ class Psycopg2Client:
         Arguments:
             qry_type: Key of the Dictionary registered in the clients/queries folder
             params: Key, Value pairs to pass as parameters to the SQL query.
-            camelize: If False (default), returns key (or field) names as database field names;
-                    if True, converts key or field names to camelCase and return
 
         Returns:
             a List of Dictionaries;
@@ -218,10 +216,9 @@ class Psycopg2Client:
             qry_type: str,
             params: dict,
             *,
-            camelize: bool = False,
-            en: bool = None,
+            en: bool = False,
             fetchone: bool = False,
-            cursor: any,
+            cursor: RealDictCursor,
         ):
             if not isinstance(params, dict):
                 params = vars(params)
@@ -258,8 +255,6 @@ class Psycopg2Client:
 
             if not rows:
                 return rows
-            if camelize:
-                rows = humps.camelize(rows)
 
             return rows
 
@@ -269,20 +264,18 @@ class Psycopg2Client:
             rows = read_rows_by_param(
                 qry_type,
                 params,
-                camelize=camelize,
                 en=en,
                 fetchone=fetchone,
                 cursor=cursor,
             )
         else:
             conn_pool = Psycopg2Client._conn_pool
+            conn = conn_pool.getconn()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
-                conn = conn_pool.getconn()
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
                 rows = read_rows_by_param(
                     qry_type,
                     params,
-                    camelize=camelize,
                     en=en,
                     fetchone=fetchone,
                     cursor=cursor,
@@ -298,15 +291,13 @@ class Psycopg2Client:
         qry_type: str,
         params: dict,
         *,
-        camelize: bool = False,
-        en: bool = None,
+        en: bool = False,
     ) -> RealDictRow | None:
         """call read_rows"""
 
         rows = self.read_rows(
             qry_type,
             params,
-            camelize=camelize,
             en=en,
             fetchone=True,
         )
@@ -321,7 +312,7 @@ class Psycopg2Client:
         params: dict,
         *,
         row_count_partial: int = 100,
-        en: bool = None,
+        en: bool = False,
     ) -> AsyncGenerator[bytes, None]:
         """Return rows partially in batches with async
 
@@ -339,8 +330,8 @@ class Psycopg2Client:
             params: dict,
             *,
             row_count_partial: int = 100,
-            en: bool = None,
-            cursor: any,
+            en: bool = False,
+            cursor: RealDictCursor,
         ) -> AsyncGenerator[bytes, None]:
             if not isinstance(params, dict):
                 params = vars(params)
@@ -348,14 +339,14 @@ class Psycopg2Client:
             cursor_name = "cur_partial"
             qry_str = (
                 f"DECLARE {cursor_name} CURSOR FOR"
-                f" {self._get_query_by_qry_type(qry_type, params, "csv", en)}"
+                f" {self._get_query_by_qry_type(qry_type, params, 'csv', en)}"
             )
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
             if self.db_settings.use_conditional and "#if" in qry_str:
                 qry_str = get_conditional(qry_str, params)
 
-            rows: list[tuple] = []
+            rows: list[RealDictRow] = []
             is_second = False
 
             # without  UTF-8 BOM, hangul will be broken.
@@ -388,7 +379,7 @@ class Psycopg2Client:
 
                 csv_out = io.StringIO()
                 csv_w = csv.writer(csv_out)
-                if not is_second:
+                if not is_second and cursor.description:
                     column_names = [desc[0] for desc in cursor.description]
                     csv_w.writerow(column_names)
                 csv_w.writerows(rows)
@@ -398,7 +389,7 @@ class Psycopg2Client:
                 is_second = True
 
         if self.in_with_block:
-            cursor = self.conn.cursor()  # default cursor_factory is tuple
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             async for value in read_csv_partial_async_by_param(
                 qry_type,
                 params,
@@ -409,9 +400,9 @@ class Psycopg2Client:
                 yield value
         else:
             conn_pool = Psycopg2Client._conn_pool
+            conn = conn_pool.getconn()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
-                conn = conn_pool.getconn()
-                cursor = conn.cursor()  # default cursor_factory is tuple
                 async for value in read_csv_partial_async_by_param(
                     qry_type,
                     params,
@@ -430,7 +421,7 @@ class Psycopg2Client:
         params: dict,
         *,
         row_count_partial: int = 100,
-        en: bool = None,
+        en: bool = False,
     ) -> Generator[bytes, None, None]:
         """Return rows partially in batches
 
@@ -448,8 +439,8 @@ class Psycopg2Client:
             params: dict,
             *,
             row_count_partial: int = 100,
-            en: bool = None,
-            cursor: any,
+            en: bool = False,
+            cursor: RealDictCursor,
         ) -> Generator[bytes, None, None]:
             if not isinstance(params, dict):
                 params = vars(params)
@@ -457,7 +448,7 @@ class Psycopg2Client:
             cursor_name = "cur_partial"
             qry_str = (
                 f"DECLARE {cursor_name} CURSOR FOR"
-                f" {self._get_query_by_qry_type(qry_type, params, "csv", en)}"
+                f" {self._get_query_by_qry_type(qry_type, params, 'csv', en)}"
             )
             if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
                 qry_str = self._replace_en_ko_column_alias(qry_str, en)
@@ -496,7 +487,7 @@ class Psycopg2Client:
 
                 csv_out = io.StringIO()
                 csv_w = csv.writer(csv_out)
-                if not is_second:
+                if not is_second and cursor.description:
                     column_names = [desc[0] for desc in cursor.description]
                     csv_w.writerow(column_names)
                 csv_w.writerows(rows)
@@ -506,7 +497,7 @@ class Psycopg2Client:
                 is_second = True
 
         if self.in_with_block:
-            cursor = self.conn.cursor()  # default cursor_factory is tuple
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             yield from read_csv_partial_by_param(
                 qry_type,
                 params,
@@ -516,9 +507,9 @@ class Psycopg2Client:
             )
         else:
             conn_pool = Psycopg2Client._conn_pool
+            conn = conn_pool.getconn()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
-                conn = conn_pool.getconn()
-                cursor = conn.cursor()  # default cursor_factory is tuple
                 yield from read_csv_partial_by_param(
                     qry_type,
                     params,
@@ -532,7 +523,7 @@ class Psycopg2Client:
 
     def updates(
         self,
-        qry_type_params_list: list[tuple[str, dict]] | list[tuple[str, dict, dict]],
+        qry_type_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
     ) -> list[int]:
         """Executes a list of SQL statements within a single transaction.
         If all SQL commands succeed, returns a list of the number of rows affected by each qry_type.
@@ -548,15 +539,15 @@ class Psycopg2Client:
         """
 
         def updates_by_param(
-            qry_type_params_list: list[tuple[str, dict]] | list[tuple[str, dict, dict]],
-            cursor: any,
+            qry_type_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
+            cursor: RealDictCursor,
         ) -> list[int]:
             row_counts: list[int] = []
             qry_strs: list[str] = []
 
-            self._normalize_qry_type_params_list(qry_type_params_list)
+            qry_type_params_list_new = self._normalize_qry_type_params_list(qry_type_params_list)
 
-            for item in qry_type_params_list:
+            for item in qry_type_params_list_new:
                 qry_type, params, params_out = item
 
                 qry_str = self._get_query_by_qry_type(qry_type, params, "update")
@@ -581,9 +572,10 @@ class Psycopg2Client:
 
                 if params_out:
                     row = cursor.fetchone()
-                    for k, v in row.items():
-                        if k in params_out:
-                            params_out[k] = v
+                    if row:
+                        for k, v in row.items():
+                            if k in params_out:
+                                params_out[k] = v
 
                 if self.db_settings.after_update_execute:
                     duration = int(round((time.time() - start) * 1000))
@@ -608,7 +600,7 @@ class Psycopg2Client:
                     row_counts = updates_by_param(qry_type_params_list, cursor)
                     cursor.close()
             finally:
-                conn_pool.putconn(conn)
+                conn_pool.putconn(conn) # type: ignore
 
         return row_counts
 
@@ -616,7 +608,7 @@ class Psycopg2Client:
         self,
         qry_type: str,
         params: dict,
-        params_out: dict = None,
+        params_out: dict = {},
     ) -> int:
         """call updates"""
 

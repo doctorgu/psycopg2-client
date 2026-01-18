@@ -9,7 +9,6 @@ from mock_data.data_all import (
     get_out_by_params,
 )
 
-type FuncType = Literal["update", "read", "csv"]
 
 
 def patch_psycopg2(mocker):
@@ -21,19 +20,19 @@ def patch_psycopg2(mocker):
         def __init__(self):
             self.qry_str = ""
             self.qry_type = ""
-            self.func_type: FuncType = "read"
-            self.params: dict[str, any] = {}
-            self.en: bool = None
+            self.func_type: Literal["update", "read", "csv"] = "read"
+            self.params: dict[str, any] = {} # type: ignore
+            self.en: bool = False
 
             self.rows: list[dict] = []
-            self.row: dict = {}
+            self.row: dict | None = None
             self.rowcount: int = 0
             self._first_fetch_csv: bool = True
 
-        def execute(self, qry_str: str, params: dict[str, any]):
+        def execute(self, qry_str: str, params: dict[str, any]): # type: ignore
             """execute"""
 
-            def get_header() -> dict[Literal["qry_type", "func_type", "en"], any]:
+            def get_header() -> dict[Literal["qry_type", "func_type", "en"], any]: # type: ignore
                 ret = re.match(r"/\*(.+)\*/", qry_str)
                 if not ret:
                     raise ValueError("no header in query")
@@ -44,8 +43,8 @@ def patch_psycopg2(mocker):
 
             def set_test_info(
                 qry_type: str,
-                func_type: FuncType,
-                en: bool = None,
+                func_type: Literal["update", "read", "csv"],
+                en: bool = False,
             ):
                 """set info for test only"""
 

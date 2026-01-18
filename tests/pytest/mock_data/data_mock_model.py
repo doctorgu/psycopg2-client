@@ -9,7 +9,7 @@ class DataMock(BaseModel):
 
     qry_type: str
     params: dict
-    en: bool | None = None
+    en: bool = False
     params_ignore: list[str] = []
     params_replace: Callable | None = None
 

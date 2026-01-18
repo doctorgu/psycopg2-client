@@ -76,7 +76,7 @@ def convert_type_out(data: UpdatesMock) -> UpdatesMock:
 
 
 def check_dup(
-    lst: list[ReadRowsMock | UpdatesMock],
+    lst: list[ReadRowsMock] | list[UpdatesMock],
     item_new: ReadRowsMock | UpdatesMock,
 ):
     """if duplicated raise error"""
@@ -132,7 +132,7 @@ def filter_params_ignore(params: dict, params_ignore: list[str]) -> dict:
     return params_new
 
 
-def replace_params(params: dict, params_replace: Callable) -> dict:
+def replace_params(params: dict, params_replace: Callable | None) -> dict:
     """replace params by params_replace function"""
     if not params_replace:
         return params
@@ -140,7 +140,7 @@ def replace_params(params: dict, params_replace: Callable) -> dict:
     return params_replace(params)
 
 
-def get_rows_by_params(qry_type: str, params: dict, en: bool = None) -> list[dict]:
+def get_rows_by_params(qry_type: str, params: dict, en: bool = False) -> list[dict]:
     """get rows by qry_type and params (called from patch_psycopg2)"""
 
     qry_type_found = False

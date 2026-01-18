@@ -30,22 +30,22 @@ class Psycopg2ClientSettings:
     #endif
     """
 
-    before_read_execute: Callable[[str, dict, str, str], None] = None
+    before_read_execute: Callable[[str, dict, str, str], None]
     """
     qry_type: str, params: dict, qry_str: str, qry_with_value: str
     """
-    after_read_execute: Callable[[str, int], None] = None
+    after_read_execute: Callable[[str, int], None]
     """
     qry_type: str, duration: int
     """
     before_update_execute: Callable[
         [str, dict, dict, str, str],
         None,
-    ] = None
+    ]
     """
     qry_type: str, params: dict, params_out: dict, qry_str: str, qry_with_value: str
     """
-    after_update_execute: Callable[[str, int, dict, int], None] = None
+    after_update_execute: Callable[[str, int, dict, int], None]
     """
     qry_type: str, row_count: int, params_out: dict, duration: int
     """

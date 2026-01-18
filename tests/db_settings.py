@@ -7,11 +7,11 @@ from psycopg2_client_settings import Psycopg2ClientSettings
 load_dotenv()
 
 db_settings = Psycopg2ClientSettings(
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=int(os.getenv("DB_PORT")),
-    database=os.getenv("DB_DATABASE"),
-    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD", ""),
+    host=os.getenv("DB_HOST", ""),
+    port=int(os.getenv("DB_PORT", "5432")),
+    database=os.getenv("DB_DATABASE", ""),
+    user=os.getenv("DB_USER", ""),
     minconn=3,
     maxconn=6,
     connect_timeout=3,

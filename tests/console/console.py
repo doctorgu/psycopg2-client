@@ -1,12 +1,6 @@
 """db_client_test"""
 
-import sys
 import json
-
-# psycopg2-client
-sys.path.append(__file__[0 : __file__.find("psycopg2-client") + len("psycopg2-client")])
-
-# pylint: disable=wrong-import-position
 from tests.db_settings import db_settings
 from tests.db_client import DbClient
 from psycopg2_client import Psycopg2Client
@@ -170,6 +164,29 @@ def use_db_client():
     # {"user_id": "gildong.hong"}
     print(use_db_client.__name__, row)
 
+def use_with():
+    """use with to use transaction (all or nothing)"""
+
+    try:
+        with DbClient() as db_client:
+            for i in range(3):
+                db_client.update(
+                    "upsert_user", {"user_id": f"{i}.오", "user_name": f"오{i}"}
+                )
+                rows = db_client.read_rows(
+                    "read_user_search", {"user_id": "", "user_name": "오%"}
+                )
+                print(use_with.__name__, "len:", len(rows))
+
+                if i == 2:
+                    raise RuntimeError("to cancel 3 upsert")
+    except RuntimeError:
+        rows = DbClient().read_rows(
+            "read_user_search", {"user_id": "", "user_name": "오%"}
+        )
+        # 0 because rolled back all upsert_user
+        print(use_with.__name__, "len:", len(rows))
+
 
 create_tables()
 upsert_user()
@@ -183,5 +200,6 @@ read_using_conditional2()
 read_using_en_ko1()
 read_using_en_ko2()
 use_db_client()
+use_with()
 
 # python tests/console/console.py
