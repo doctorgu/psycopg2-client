@@ -51,9 +51,9 @@ FROM    t;
 ### 2. Configure Database Connection
 
 ```python
-from psycopg2_client.psycopg2_client_settings import Psycopg2ClientSettings
+from psycopg2_client.settings import Settings
 
-db_settings = Psycopg2ClientSettings(
+db_settings = Settings(
     host="127.0.0.1",
     port=5432,
     database="postgres",
@@ -82,9 +82,9 @@ db_settings = Psycopg2ClientSettings(
 ### 3. Basic Usage
 
 ```python
-from psycopg2_client.psycopg2_client import Psycopg2Client
+from psycopg2_client.client import Client
 
-db = Psycopg2Client(db_settings=db_settings)
+db = Client(db_settings=db_settings)
 
 # Read single row
 row = db.read_row("read_user_id_all", {})
@@ -138,7 +138,7 @@ print("Batch results:", results)  # [1, 1]
 Automatically commits on success, rolls back on exception:
 
 ```python
-with Psycopg2Client(db_settings=db_settings) as db:
+with Client(db_settings=db_settings) as db:
     new_id = "youngja.lee"
     db.update("upsert_user", {"user_id": new_id, "user_name": "이영자"})
     db.update("delete_user", {"user_id": new_id})  # Oops! Will rollback entire block
@@ -155,7 +155,7 @@ Read rows partially and return immediately to client to show progress in client
 def read_csv_partial():
     """read csv partial"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
     filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
 
     return Response(
@@ -180,7 +180,7 @@ def read_csv_partial():
 async def read_csv_partial_async():
     """read csv partial async"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
     filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
 
     return StreamingResponse(
