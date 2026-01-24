@@ -12,6 +12,7 @@ from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
 from psycopg2.extensions import connection
 
+# pylint: disable=relative-beyond-top-level
 from .settings import Settings
 from .client_util import get_conditional
 from .queries.query_all import qry_dic
@@ -69,9 +70,9 @@ class Client:
         self.query_recent = ""
 
         if db_settings not in db_set_and_pool:
-            pool = ClientPool(db_settings)
-            db_set_and_pool[db_settings] = pool
-            Client._conn_pool = pool
+            client_pool = ClientPool(db_settings)
+            db_set_and_pool[db_settings] = client_pool
+            Client._conn_pool = client_pool
 
     def __enter__(self):
         # Called when entering the 'with' block
@@ -608,6 +609,7 @@ class Client:
         self,
         qry_type: str,
         params: dict,
+        # pylint: disable=dangerous-default-value
         params_out: dict = {},
     ) -> int:
         """call updates"""

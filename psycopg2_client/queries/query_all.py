@@ -1,5 +1,6 @@
 """query collection"""
 
+# pylint: disable=relative-beyond-top-level
 from .query_update import qry_dic as query_update
 from .query_read import qry_dic as query_read
 
