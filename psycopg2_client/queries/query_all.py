@@ -1,7 +1,7 @@
 """query collection"""
 
-from queries.query_update import qry_dic as query_update
-from queries.query_read import qry_dic as query_read
+from psycopg2_client.queries.query_update import qry_dic as query_update
+from psycopg2_client.queries.query_read import qry_dic as query_read
 
 qry_all = [query_update, query_read]
 

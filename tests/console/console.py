@@ -3,20 +3,20 @@
 import json
 from tests.db_settings import db_settings
 from tests.db_client import DbClient
-from psycopg2_client import Psycopg2Client
+from psycopg2_client.client import Client
 
 
 def create_tables():
     """create tables"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
     db_client.update("create_tables", {})
 
 
 def upsert_user():
     """upsert user"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     row_count = db_client.update(
         "upsert_user", {"user_id": "gildong.hong", "user_name": "홍길똥"}
@@ -29,7 +29,7 @@ def upsert_user():
 def upsert_user_params_out():
     """upsert user and get parameters"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     params_out = {"user_name": ""}
     db_client.update(
@@ -47,7 +47,7 @@ def upsert_user_params_out():
 def upsert_user_list():
     """upsert user list (one transaction)"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     qry_list = [
         ("upsert_user", {"user_id": "sunja.kim", "user_name": "김순자"}),
@@ -62,7 +62,7 @@ def upsert_user_list():
 def upsert_delete_user_with():
     """upsert user and delete in with (one transaction)"""
 
-    with Psycopg2Client(db_settings=db_settings) as db_client:
+    with Client(db_settings=db_settings) as db_client:
         id_ = "youngja.lee"
         user_name = "이영자"
         db_client.update("upsert_user", {"user_id": id_, "user_name": user_name})
@@ -76,7 +76,7 @@ def upsert_delete_user_with():
 def read_user_one_row():
     """read first one row"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     row = db_client.read_row("read_user_id_all", {})
 
@@ -87,7 +87,7 @@ def read_user_one_row():
 def read_user_all_rows():
     """read all rows"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     rows = db_client.read_rows("read_user_id_all", {})
 
@@ -102,7 +102,7 @@ def read_user_all_rows():
 def read_using_en_ko1():
     """set column user_name by en variable"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     # SELECT  user_id "Id", user_name "Name"
     # FROM    t_user
@@ -115,7 +115,7 @@ def read_using_en_ko1():
 def read_using_en_ko2():
     """set column user_name by en variable"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     # SELECT  user_id "아이디", user_name "이름"
     # FROM    t_user
@@ -128,7 +128,7 @@ def read_using_en_ko2():
 def read_using_conditional1():
     """read using conditional 1 (#if #elif #endif)"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     # SELECT  user_id, user_name, insert_time, update_time
     # FROM    t_user
@@ -144,7 +144,7 @@ def read_using_conditional1():
 def read_using_conditional2():
     """read using conditional 2 (#if #elif #endif)"""
 
-    db_client = Psycopg2Client(db_settings=db_settings)
+    db_client = Client(db_settings=db_settings)
 
     # SELECT  user_id, user_name, insert_time, update_time
     # FROM    t_user
@@ -202,4 +202,4 @@ read_using_en_ko2()
 use_db_client()
 use_with()
 
-# python tests/console/console.py
+# python -m tests.console.console

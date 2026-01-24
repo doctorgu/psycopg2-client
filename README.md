@@ -51,7 +51,7 @@ FROM    t;
 ### 2. Configure Database Connection
 
 ```python
-from psycopg2_client_settings import Psycopg2ClientSettings
+from psycopg2_client.psycopg2_client_settings import Psycopg2ClientSettings
 
 db_settings = Psycopg2ClientSettings(
     host="127.0.0.1",
@@ -82,7 +82,7 @@ db_settings = Psycopg2ClientSettings(
 ### 3. Basic Usage
 
 ```python
-from psycopg2_client import Psycopg2Client
+from psycopg2_client.psycopg2_client import Psycopg2Client
 
 db = Psycopg2Client(db_settings=db_settings)
 

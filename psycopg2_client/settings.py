@@ -1,11 +1,11 @@
-"""db_client_settings"""
+"""settings"""
 
 from dataclasses import dataclass
 from typing import Callable
 
 
 @dataclass(frozen=True)
-class Psycopg2ClientSettings:
+class Settings:
     """db client settings"""
 
     password: str

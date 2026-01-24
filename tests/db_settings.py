@@ -2,11 +2,11 @@
 
 import os
 from dotenv import load_dotenv
-from psycopg2_client_settings import Psycopg2ClientSettings
+from psycopg2_client.settings import Settings
 
 load_dotenv()
 
-db_settings = Psycopg2ClientSettings(
+db_settings = Settings(
     password=os.getenv("DB_PASSWORD", ""),
     host=os.getenv("DB_HOST", ""),
     port=int(os.getenv("DB_PORT", "5432")),

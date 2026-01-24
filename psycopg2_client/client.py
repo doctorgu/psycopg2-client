@@ -12,15 +12,15 @@ from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
 from psycopg2.extensions import connection
 
-from psycopg2_client_settings import Psycopg2ClientSettings
-from psycopg2_client_util import get_conditional
-from queries.query_all import qry_dic
+from psycopg2_client.settings import Settings
+from psycopg2_client.client_util import get_conditional
+from psycopg2_client.queries.query_all import qry_dic
 
 
-class Psycopg2ClientPool:
+class ClientPool:
     """database connection pool"""
 
-    def __init__(self, db_settings_pool: Psycopg2ClientSettings):
+    def __init__(self, db_settings_pool: Settings):
         self.conn_pool = pool.ThreadedConnectionPool(
             minconn=db_settings_pool.minconn,
             maxconn=db_settings_pool.maxconn,
@@ -50,16 +50,16 @@ class Psycopg2ClientPool:
         self.conn_pool.putconn(conn)
 
 
-db_set_and_pool: dict[Psycopg2ClientSettings, Psycopg2ClientPool] = {}
+db_set_and_pool: dict[Settings, ClientPool] = {}
 
 
-class Psycopg2Client:
+class Client:
     """database client"""
 
     # Class-level shared connection pool
-    _conn_pool: Psycopg2ClientPool
+    _conn_pool: ClientPool
 
-    def __init__(self, db_settings: Psycopg2ClientSettings):
+    def __init__(self, db_settings: Settings):
         # pylint:disable=global-statement,global-variable-not-assigned
         global db_set_and_pool
 
@@ -69,13 +69,13 @@ class Psycopg2Client:
         self.query_recent = ""
 
         if db_settings not in db_set_and_pool:
-            pool = Psycopg2ClientPool(db_settings)
+            pool = ClientPool(db_settings)
             db_set_and_pool[db_settings] = pool
-            Psycopg2Client._conn_pool = pool
+            Client._conn_pool = pool
 
     def __enter__(self):
         # Called when entering the 'with' block
-        self.conn = Psycopg2Client._conn_pool.getconn()
+        self.conn = Client._conn_pool.getconn()
         self.in_with_block = True
         return self
 
@@ -269,7 +269,7 @@ class Psycopg2Client:
                 cursor=cursor,
             )
         else:
-            conn_pool = Psycopg2Client._conn_pool
+            conn_pool = Client._conn_pool
             conn = conn_pool.getconn()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
@@ -399,7 +399,7 @@ class Psycopg2Client:
             ):
                 yield value
         else:
-            conn_pool = Psycopg2Client._conn_pool
+            conn_pool = Client._conn_pool
             conn = conn_pool.getconn()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
@@ -506,7 +506,7 @@ class Psycopg2Client:
                 cursor=cursor,
             )
         else:
-            conn_pool = Psycopg2Client._conn_pool
+            conn_pool = Client._conn_pool
             conn = conn_pool.getconn()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
@@ -593,7 +593,7 @@ class Psycopg2Client:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             row_counts = updates_by_param(qry_type_params_list, cursor)
         else:
-            conn_pool = Psycopg2Client._conn_pool
+            conn_pool = Client._conn_pool
             try:
                 with conn_pool.getconn() as conn:
                     cursor = conn.cursor(cursor_factory=RealDictCursor)
