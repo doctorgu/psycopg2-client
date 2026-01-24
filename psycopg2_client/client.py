@@ -12,9 +12,9 @@ from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
 from psycopg2.extensions import connection
 
-from psycopg2_client.settings import Settings
-from psycopg2_client.client_util import get_conditional
-from psycopg2_client.queries.query_all import qry_dic
+from .settings import Settings
+from .client_util import get_conditional
+from .queries.query_all import qry_dic
 
 
 class ClientPool:
