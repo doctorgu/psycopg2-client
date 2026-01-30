@@ -1,21 +1,22 @@
 """database client"""
 
 import csv
-from datetime import datetime, date
+from datetime import datetime
 import time
 import io
 import atexit
-import json
-import re
-from typing import AsyncGenerator, Generator, Literal
+from typing import AsyncGenerator, Generator
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, RealDictRow
 from psycopg2.extensions import connection
 
 # pylint: disable=relative-beyond-top-level
+from .query_by_key.query_util import (
+    get_query_with_value,
+)
+from .query_by_key.query import Query
+from .query_by_key.settings import Settings as QrySettings
 from .settings import Settings
-from .client_util import get_conditional
-from .queries.query_all import qry_dic
 
 
 class ClientPool:
@@ -51,7 +52,7 @@ class ClientPool:
         self.conn_pool.putconn(conn)
 
 
-db_set_and_pool: dict[Settings, ClientPool] = {}
+db_set_and_pool: dict[str, ClientPool] = {}
 
 
 class Client:
@@ -67,11 +68,19 @@ class Client:
         self.conn: connection
         self.in_with_block = False
         self.db_settings = db_settings
+        self.qry = Query(
+            qry_settings=QrySettings(
+                use_en_ko_column_alias=db_settings.use_en_ko_column_alias,
+                use_conditional=db_settings.use_conditional,
+                all_query=db_settings.all_query,
+            )
+        )
         self.query_recent = ""
 
-        if db_settings not in db_set_and_pool:
+        db_set_key = db_settings.key
+        if db_set_key not in db_set_and_pool:
             client_pool = ClientPool(db_settings)
-            db_set_and_pool[db_settings] = client_pool
+            db_set_and_pool[db_set_key] = client_pool
             Client._conn_pool = client_pool
 
     def __enter__(self):
@@ -95,109 +104,9 @@ class Client:
 
             self.in_with_block = False
 
-    def _get_query_with_value(self, qry_str: str, params: dict) -> str:
-        """replace raw query to value filled query"""
-
-        def escape_literal(value) -> str:
-            ret = ""
-            if isinstance(value, str):
-                ret = "'" + value.replace("'", "''") + "'"
-            elif isinstance(value, datetime):
-                ret = f"'{value.strftime('%Y-%m-%d %H:%M:%S.%f')}'::TIMESTAMP"
-            elif isinstance(value, list):
-                ret = f"ARRAY{str(value)}"
-            elif value is None:
-                ret = "NULL"
-            else:
-                ret = str(value)
-            return ret
-
-        # query_raw = sql.SQL(qry_str).as_string(conn)
-        # query_replaced = query_raw
-        query_replaced = qry_str
-        for key, value in params.items():
-            find = f"%({key})s"
-            if find in query_replaced:
-                replace = escape_literal(value)
-                query_replaced = query_replaced.replace(find, replace)
-        # %% -> % : psycopg2
-        # {{}} -> {} : python
-        query_replaced = (
-            query_replaced.replace("%%", "%").replace("{{", "{").replace("}}", "}")
-        )
-
-        return query_replaced
-
-    def _replace_en_ko_column_alias(self, qry_str: str, en: bool) -> str:
-        """ "
-        return en part or ko part separated by '|' using en variable
-        ex:
-        tbl.obj_nm "File Name|파일명"
-        ->
-        tbl.obj_nm "File Name"
-        """
-
-        pattern = r'(?P<ws>\s)"(?P<en>[^"]+)\|(?P<ko>[^"]+)"'
-        en_ko = "en" if en else "ko"
-        repl = rf'\g<ws>"\g<{en_ko}>"'
-        qry_str_new = re.sub(pattern, repl, qry_str, 0, re.MULTILINE | re.IGNORECASE)
-        return qry_str_new
-
-    def _normalize_qry_type_params_list(
-        self,
-        qry_type_params_list: list[any], # type: ignore
-    )-> list[tuple[str, dict, dict]]:
-        """normalize all item from parameter of Psycopg2Client.updates"""
-
-        qry_type_params_list_new: list[tuple[str, dict, dict]] = []
-        for item in qry_type_params_list:
-            # append params_out if not exists
-            item_new: tuple[str, dict, dict] = item if len(item) == 3 else (item[0], item[1], {})
-
-            qry_type, params, params_out = item_new
-            if not isinstance(params, dict):
-                params: dict = vars(params)
-
-            if params_out is None:
-                params_out = {}
-            if not isinstance(params_out, dict):
-                params_out: dict = vars(params_out)
-
-            qry_type_params_list_new.append((qry_type, params, params_out))
-
-        return qry_type_params_list_new
-
-    def _get_query_by_qry_type(
-        self,
-        qry_type: str,
-        params: dict,
-        func_type: Literal["update", "read", "csv"],
-        en: bool = False,
-    ) -> str:
-        def serial_date(obj):
-            """JSON serializer for objects not serializable by default json code"""
-
-            if isinstance(obj, (datetime, date)):
-                return obj.isoformat()
-            return str(obj)
-
-        query = qry_dic.get(qry_type)
-        if not query:
-            raise KeyError(f"{qry_type} not exists")
-
-        info = {
-            "qry_type": qry_type,
-            "params": [{k: v.replace("%", "{{percent}}")} for k, v in params.items()],
-            "func_type": func_type,
-            "en": en,
-        }
-        return (
-            f"/* {json.dumps(info, ensure_ascii=False, default=serial_date)} */{query}"
-        )
-
     def read_rows(
         self,
-        qry_type: str,
+        qry_key: str,
         params: dict,
         *,
         en: bool = False,
@@ -206,7 +115,7 @@ class Client:
         """Returns all rows
 
         Arguments:
-            qry_type: Key of the Dictionary registered in the clients/queries folder
+            qry_key: Key of the Dictionary registered in the clients/queries folder
             params: Key, Value pairs to pass as parameters to the SQL query.
 
         Returns:
@@ -214,7 +123,7 @@ class Client:
         """
 
         def read_rows_by_param(
-            qry_type: str,
+            qry_key: str,
             params: dict,
             *,
             en: bool = False,
@@ -224,19 +133,15 @@ class Client:
             if not isinstance(params, dict):
                 params = vars(params)
 
-            qry_str = self._get_query_by_qry_type(qry_type, params, "read", en)
-            if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
-                qry_str = self._replace_en_ko_column_alias(qry_str, en)
-            if self.db_settings.use_conditional and "#if" in qry_str:
-                qry_str = get_conditional(qry_str, params)
+            qry_str = self.qry.get_query_by_key(qry_key, params, "read", en)
 
             start = 0
             if self.db_settings.before_read_execute:
                 self.db_settings.before_read_execute(
-                    qry_type,
+                    qry_key,
                     params,
                     qry_str,
-                    self._get_query_with_value(qry_str, params),
+                    get_query_with_value(qry_str, params),
                 )
                 start = time.time()
 
@@ -252,7 +157,7 @@ class Client:
 
             if self.db_settings.after_read_execute:
                 duration = int(round((time.time() - start) * 1000))
-                self.db_settings.after_read_execute(qry_type, duration)
+                self.db_settings.after_read_execute(qry_key, duration)
 
             if not rows:
                 return rows
@@ -263,7 +168,7 @@ class Client:
         if self.in_with_block:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             rows = read_rows_by_param(
-                qry_type,
+                qry_key,
                 params,
                 en=en,
                 fetchone=fetchone,
@@ -275,7 +180,7 @@ class Client:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
                 rows = read_rows_by_param(
-                    qry_type,
+                    qry_key,
                     params,
                     en=en,
                     fetchone=fetchone,
@@ -289,7 +194,7 @@ class Client:
 
     def read_row(
         self,
-        qry_type: str,
+        qry_key: str,
         params: dict,
         *,
         en: bool = False,
@@ -297,7 +202,7 @@ class Client:
         """call read_rows"""
 
         rows = self.read_rows(
-            qry_type,
+            qry_key,
             params,
             en=en,
             fetchone=True,
@@ -309,7 +214,7 @@ class Client:
 
     async def read_csv_partial_async(
         self,
-        qry_type: str,
+        qry_key: str,
         params: dict,
         *,
         row_count_partial: int = 100,
@@ -318,7 +223,7 @@ class Client:
         """Return rows partially in batches with async
 
         Arguments:
-            qry_type: key of the Dictionary registered in the clients/queries folder
+            qry_key: key of the Dictionary registered in the clients/queries folder
             params: key, value pairs to pass as parameters to the SQL query.
             row_count_partial: Number of rows to return at a time
 
@@ -327,7 +232,7 @@ class Client:
         """
 
         async def read_csv_partial_async_by_param(
-            qry_type: str,
+            qry_key: str,
             params: dict,
             *,
             row_count_partial: int = 100,
@@ -340,12 +245,8 @@ class Client:
             cursor_name = "cur_partial"
             qry_str = (
                 f"DECLARE {cursor_name} CURSOR FOR"
-                f" {self._get_query_by_qry_type(qry_type, params, 'csv', en)}"
+                f" {self.qry.get_query_by_key(qry_key, params, 'csv', en)}"
             )
-            if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
-                qry_str = self._replace_en_ko_column_alias(qry_str, en)
-            if self.db_settings.use_conditional and "#if" in qry_str:
-                qry_str = get_conditional(qry_str, params)
 
             rows: list[RealDictRow] = []
             is_second = False
@@ -360,10 +261,10 @@ class Client:
                 if not is_second:
                     if self.db_settings.before_read_execute:
                         self.db_settings.before_read_execute(
-                            qry_type,
+                            qry_key,
                             params,
                             qry_str,
-                            self._get_query_with_value(qry_str, params),
+                            get_query_with_value(qry_str, params),
                         )
                         start = time.time()
 
@@ -373,7 +274,7 @@ class Client:
                 if not is_second:
                     if self.db_settings.after_read_execute:
                         duration = int(round((time.time() - start) * 1000))
-                        self.db_settings.after_read_execute(qry_type, duration)
+                        self.db_settings.after_read_execute(qry_key, duration)
 
                 if not rows:
                     break
@@ -392,7 +293,7 @@ class Client:
         if self.in_with_block:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             async for value in read_csv_partial_async_by_param(
-                qry_type,
+                qry_key,
                 params,
                 row_count_partial=row_count_partial,
                 en=en,
@@ -405,7 +306,7 @@ class Client:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
                 async for value in read_csv_partial_async_by_param(
-                    qry_type,
+                    qry_key,
                     params,
                     row_count_partial=row_count_partial,
                     en=en,
@@ -418,7 +319,7 @@ class Client:
 
     def read_csv_partial(
         self,
-        qry_type: str,
+        qry_key: str,
         params: dict,
         *,
         row_count_partial: int = 100,
@@ -427,7 +328,7 @@ class Client:
         """Return rows partially in batches
 
         Arguments:
-            qry_type: key of the Dictionary registered in the clients/queries folder
+            qry_key: key of the Dictionary registered in the clients/queries folder
             params: key, value pairs to pass as parameters to the SQL query.
             row_count_partial: Number of rows to return at a time
 
@@ -436,7 +337,7 @@ class Client:
         """
 
         def read_csv_partial_by_param(
-            qry_type: str,
+            qry_key: str,
             params: dict,
             *,
             row_count_partial: int = 100,
@@ -449,12 +350,8 @@ class Client:
             cursor_name = "cur_partial"
             qry_str = (
                 f"DECLARE {cursor_name} CURSOR FOR"
-                f" {self._get_query_by_qry_type(qry_type, params, 'csv', en)}"
+                f" {self.qry.get_query_by_key(qry_key, params, 'csv', en)}"
             )
-            if self.db_settings.use_en_ko_column_alias and isinstance(en, bool):
-                qry_str = self._replace_en_ko_column_alias(qry_str, en)
-            if self.db_settings.use_conditional and "#if" in qry_str:
-                qry_str = get_conditional(qry_str, params)
 
             rows: list[RealDictRow] = []
             is_second = False
@@ -469,10 +366,10 @@ class Client:
                 if not is_second:
                     if self.db_settings.before_read_execute:
                         self.db_settings.before_read_execute(
-                            qry_type,
+                            qry_key,
                             params,
                             qry_str,
-                            self._get_query_with_value(qry_str, params),
+                            get_query_with_value(qry_str, params),
                         )
                         start = time.time()
 
@@ -482,7 +379,7 @@ class Client:
                 if not is_second:
                     if self.db_settings.after_read_execute:
                         duration = int(round((time.time() - start) * 1000))
-                        self.db_settings.after_read_execute(qry_type, duration)
+                        self.db_settings.after_read_execute(qry_key, duration)
                 if not rows:
                     break
 
@@ -500,7 +397,7 @@ class Client:
         if self.in_with_block:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             yield from read_csv_partial_by_param(
-                qry_type,
+                qry_key,
                 params,
                 row_count_partial=row_count_partial,
                 en=en,
@@ -512,7 +409,7 @@ class Client:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             try:
                 yield from read_csv_partial_by_param(
-                    qry_type,
+                    qry_key,
                     params,
                     row_count_partial=row_count_partial,
                     en=en,
@@ -524,47 +421,68 @@ class Client:
 
     def updates(
         self,
-        qry_type_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
+        qry_key_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
     ) -> list[int]:
         """Executes a list of SQL statements within a single transaction.
-        If all SQL commands succeed, returns a list of the number of rows affected by each qry_type.
+        If all SQL commands succeed, returns a list of the number of rows affected by each qry_key.
         If any command fails, an error is raised.
 
         Arguments:
-            qry_type_params_list: A list of tuples, each containing the following two values:
-                qry_type: key of the dictionary registered in the clients/queries folder
+            qry_key_params_list: A list of tuples, each containing the following two values:
+                qry_key: key of the dictionary registered in the clients/queries folder
                 params: key, value pairs to pass as parameters to the SQL query.
 
         Returns:
             A list of the number of rows affected
         """
 
+        def normalize_qry_key_params_list(
+            qry_key_params_list: list[any],  # type: ignore
+        ) -> list[tuple[str, dict, dict]]:
+            """normalize all item from parameter of Psycopg2Client.updates"""
+
+            qry_key_params_list_new: list[tuple[str, dict, dict]] = []
+            for item in qry_key_params_list:
+                # append params_out if not exists
+                item_new: tuple[str, dict, dict] = (
+                    item if len(item) == 3 else (item[0], item[1], {})
+                )
+
+                qry_key, params, params_out = item_new
+                if not isinstance(params, dict):
+                    params: dict = vars(params)
+
+                if params_out is None:
+                    params_out = {}
+                if not isinstance(params_out, dict):
+                    params_out: dict = vars(params_out)
+
+                qry_key_params_list_new.append((qry_key, params, params_out))
+
+            return qry_key_params_list_new
+
         def updates_by_param(
-            qry_type_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
+            qry_key_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
             cursor: RealDictCursor,
         ) -> list[int]:
             row_counts: list[int] = []
             qry_strs: list[str] = []
 
-            qry_type_params_list_new = self._normalize_qry_type_params_list(qry_type_params_list)
+            qry_key_params_list_new = normalize_qry_key_params_list(qry_key_params_list)
 
-            for item in qry_type_params_list_new:
-                qry_type, params, params_out = item
+            for item in qry_key_params_list_new:
+                qry_key, params, params_out = item
 
-                qry_str = self._get_query_by_qry_type(qry_type, params, "update")
-                if not qry_str:
-                    raise KeyError(f"{qry_type} not exists")
-                if self.db_settings.use_conditional and "#if" in qry_str:
-                    qry_str = get_conditional(qry_str, params)
+                qry_str = self.qry.get_query_by_key(qry_key, params, "update")
 
                 start = 0
                 if self.db_settings.before_update_execute:
                     self.db_settings.before_update_execute(
-                        qry_type,
+                        qry_key,
                         params,
                         params_out,
                         qry_str,
-                        self._get_query_with_value(qry_str, params),
+                        get_query_with_value(qry_str, params),
                     )
                     start = time.time()
 
@@ -581,7 +499,7 @@ class Client:
                 if self.db_settings.after_update_execute:
                     duration = int(round((time.time() - start) * 1000))
                     self.db_settings.after_update_execute(
-                        qry_type, row_count, params_out, duration
+                        qry_key, row_count, params_out, duration
                     )
 
                 row_counts.append(row_count)
@@ -592,29 +510,29 @@ class Client:
         row_counts: list[int] = []
         if self.in_with_block:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-            row_counts = updates_by_param(qry_type_params_list, cursor)
+            row_counts = updates_by_param(qry_key_params_list, cursor)
         else:
             conn_pool = Client._conn_pool
             try:
                 with conn_pool.getconn() as conn:
                     cursor = conn.cursor(cursor_factory=RealDictCursor)
-                    row_counts = updates_by_param(qry_type_params_list, cursor)
+                    row_counts = updates_by_param(qry_key_params_list, cursor)
                     cursor.close()
             finally:
-                conn_pool.putconn(conn) # type: ignore
+                conn_pool.putconn(conn)  # type: ignore
 
         return row_counts
 
     def update(
         self,
-        qry_type: str,
+        qry_key: str,
         params: dict,
         # pylint: disable=dangerous-default-value
         params_out: dict = {},
     ) -> int:
         """call updates"""
 
-        row_counts = self.updates([(qry_type, params, params_out)])
+        row_counts = self.updates([(qry_key, params, params_out)])
         return row_counts[0] if row_counts else 0
 
 

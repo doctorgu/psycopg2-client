@@ -5,7 +5,6 @@ from tests.db_settings import db_settings
 from tests.db_client import DbClient
 from psycopg2_client.client import Client
 
-
 def create_tables():
     """create tables"""
 

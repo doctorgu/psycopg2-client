@@ -19,7 +19,7 @@ def patch_psycopg2(mocker):
 
         def __init__(self):
             self.qry_str = ""
-            self.qry_type = ""
+            self.qry_key = ""
             self.func_type: Literal["update", "read", "csv"] = "read"
             self.params: dict[str, any] = {} # type: ignore
             self.en: bool = False
@@ -32,7 +32,7 @@ def patch_psycopg2(mocker):
         def execute(self, qry_str: str, params: dict[str, any]): # type: ignore
             """execute"""
 
-            def get_header() -> dict[Literal["qry_type", "func_type", "en"], any]: # type: ignore
+            def get_header() -> dict[Literal["qry_key", "func_type", "en"], any]: # type: ignore
                 ret = re.match(r"/\*(.+)\*/", qry_str)
                 if not ret:
                     raise ValueError("no header in query")
@@ -42,23 +42,23 @@ def patch_psycopg2(mocker):
                 return info
 
             def set_test_info(
-                qry_type: str,
+                qry_key: str,
                 func_type: Literal["update", "read", "csv"],
                 en: bool = False,
             ):
                 """set info for test only"""
 
-                self.qry_type = qry_type
+                self.qry_key = qry_key
                 self.func_type = func_type
                 self.en = en
                 if func_type in ("read", "csv"):
-                    rows = get_rows_by_params(self.qry_type, self.params, self.en)
+                    rows = get_rows_by_params(self.qry_key, self.params, self.en)
                     row = rows[0] if rows else None
                     self.rows = rows
                     self.row = row
                 elif func_type == "update":
                     params_out, row_count = get_out_by_params(
-                        self.qry_type, self.params
+                        self.qry_key, self.params
                     )
                     self.row = params_out
                     self.rowcount = row_count
@@ -67,7 +67,7 @@ def patch_psycopg2(mocker):
             self.params = params
 
             header = get_header()
-            set_test_info(header["qry_type"], header["func_type"], header["en"])
+            set_test_info(header["qry_key"], header["func_type"], header["en"])
 
         def fetchall(self) -> list[dict]:
             """return rows"""

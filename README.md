@@ -64,17 +64,17 @@ db_settings = Settings(
     connect_timeout=5,
     use_en_ko_column_alias=True,
     use_conditional=True,
-    before_read_execute=lambda qry_type, params, qry_str, qry_with_value: print(
-        f'READ_ROWS_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
+    before_read_execute=lambda qry_key, params, qry_str, qry_with_value: print(
+        f'READ_ROWS_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
     ),
-    after_read_execute=lambda qry_type, duration: print(
-        f'READ_ROWS_END, QRY_TYPE: "{qry_type}"' f", DURATION: {duration}"
+    after_read_execute=lambda qry_key, duration: print(
+        f'READ_ROWS_END, QRY_KEY: "{qry_key}"' f", DURATION: {duration}"
     ),
-    before_update_execute=lambda qry_type, params, params_out, qry_str, qry_with_value: print(
-        f'UPDATES_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
+    before_update_execute=lambda qry_key, params, params_out, qry_str, qry_with_value: print(
+        f'UPDATES_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
     ),
-    after_update_execute=lambda qry_type, row_count, params_out, duration: print(
-        f'UPDATES_END, QRY_TYPE: "{qry_type}"' f", DURATION: {duration}"
+    after_update_execute=lambda qry_key, row_count, params_out, duration: print(
+        f'UPDATES_END, QRY_KEY: "{qry_key}"' f", DURATION: {duration}"
     ),
 )
 ```
@@ -304,8 +304,8 @@ def get_sql_logger(name="sql"):
     return logger
 
 logger = get_sql_logger()
-db_settings.before_read_execute = lambda qry_type, params, qry_str, qry_with_value: logger.debug(
-    f'READ_ROWS_START, QRY_TYPE: "{qry_type}"' f", QRY_WITH_VALUE: {qry_with_value}"
+db_settings.before_read_execute = lambda qry_key, params, qry_str, qry_with_value: logger.debug(
+    f'READ_ROWS_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
 )
 ```
 

@@ -7,7 +7,7 @@ out_list: list[UpdatesMock] = []
 
 out_list.append(
     UpdatesMock(
-        qry_type="create_tables",
+        qry_key="create_tables",
         params={},
         params_ignore=[],
         params_out={},
@@ -17,7 +17,7 @@ out_list.append(
 
 out_list.append(
     UpdatesMock(
-        qry_type="upsert_user",
+        qry_key="upsert_user",
         params={"user_id": "gildong.hong", "user_name": "홍길동"},
         params_ignore=[
             "user_id",
@@ -30,7 +30,7 @@ out_list.append(
 
 out_list.append(
     UpdatesMock(
-        qry_type="delete_user",
+        qry_key="delete_user",
         params={"user_id": "youngja.lee"},
         params_ignore=[],
         params_out={},

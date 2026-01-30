@@ -48,7 +48,7 @@ def convert_type_rows(data: ReadRowsMock) -> ReadRowsMock:
         rows_new.append(item_new)
 
     data_new = ReadRowsMock(
-        qry_type=data.qry_type,
+        qry_key=data.qry_key,
         params=params_new,
         en=data.en,
         params_ignore=data.params_ignore,
@@ -65,7 +65,7 @@ def convert_type_out(data: UpdatesMock) -> UpdatesMock:
     params_out_new = convert_type_dict(data.params_out)
 
     data_new = UpdatesMock(
-        qry_type=data.qry_type,
+        qry_key=data.qry_key,
         params=params_new,
         params_ignore=data.params_ignore,
         params_replace=data.params_replace,
@@ -84,14 +84,14 @@ def check_dup(
         (
             cur
             for cur in lst
-            if cur.qry_type == item_new.qry_type
+            if cur.qry_key == item_new.qry_key
             and cur.params == item_new.params
             and cur.en == item_new.en
         ),
         None,
     )
     if dup:
-        raise ValueError(f"duplicated keys: {dup.qry_type}")
+        raise ValueError(f"duplicated keys: {dup.qry_key}")
 
 
 def get_unique_rows_list() -> list[ReadRowsMock]:
@@ -140,70 +140,70 @@ def replace_params(params: dict, params_replace: Callable | None) -> dict:
     return params_replace(params)
 
 
-def get_rows_by_params(qry_type: str, params: dict, en: bool = False) -> list[dict]:
-    """get rows by qry_type and params (called from patch_psycopg2)"""
+def get_rows_by_params(qry_key: str, params: dict, en: bool = False) -> list[dict]:
+    """get rows by qry_key and params (called from patch_psycopg2)"""
 
-    qry_type_found = False
+    qry_key_found = False
     params_data_candidate: list[dict] = []
     for data_cur in rows_list:
         params_in = filter_params_ignore(params, data_cur.params_ignore)
         params_in = replace_params(params_in, data_cur.params_replace)
         params_data = filter_params_ignore(data_cur.params, data_cur.params_ignore)
 
-        is_qry_type_same = data_cur.qry_type == qry_type
-        if not qry_type_found:
-            qry_type_found = is_qry_type_same
+        is_qry_key_same = data_cur.qry_key == qry_key
+        if not qry_key_found:
+            qry_key_found = is_qry_key_same
 
-        if is_qry_type_same:
+        if is_qry_key_same:
             params_data_candidate.append(params_data)
 
-        if not is_qry_type_same or params_data != params_in or data_cur.en != en:
+        if not is_qry_key_same or params_data != params_in or data_cur.en != en:
             continue
 
         return data_cur.rows
 
     description = ""
-    if not qry_type_found:
-        description = f"{qry_type} not exists in rows_list: {[item.qry_type for item in rows_list]}"
+    if not qry_key_found:
+        description = f"{qry_key} not exists in rows_list: {[item.qry_key for item in rows_list]}"
     else:
         description = (
-            f"Not found by {qry_type}"
+            f"Not found by {qry_key}"
             f" and {json.dumps(params, default=str, ensure_ascii=False)} and en:{en}"
             f"\nCandidate: {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
         )
     raise ValueError(description)
 
 
-def get_out_by_params(qry_type: str, params: dict) -> tuple[dict, int]:
-    """get params_out, row_count by qry_type and params (called from patch_psycopg2)"""
+def get_out_by_params(qry_key: str, params: dict) -> tuple[dict, int]:
+    """get params_out, row_count by qry_key and params (called from patch_psycopg2)"""
 
-    qry_type_found = False
+    qry_key_found = False
     params_data_candidate: list[dict] = []
     for data_cur in out_list:
         params_in = filter_params_ignore(params, data_cur.params_ignore)
         params_in = replace_params(params_in, data_cur.params_replace)
         params_data = filter_params_ignore(data_cur.params, data_cur.params_ignore)
 
-        is_qry_type_same = data_cur.qry_type == qry_type
-        if not qry_type_found:
-            qry_type_found = is_qry_type_same
+        is_qry_key_same = data_cur.qry_key == qry_key
+        if not qry_key_found:
+            qry_key_found = is_qry_key_same
 
-        if is_qry_type_same:
+        if is_qry_key_same:
             params_data_candidate.append(params_data)
 
-        if not is_qry_type_same or params_data != params_in:
+        if not is_qry_key_same or params_data != params_in:
             continue
 
         return (data_cur.params_out, data_cur.row_count)
 
     description = ""
-    if not qry_type_found:
+    if not qry_key_found:
         description = (
-            f"{qry_type} not exists in out_list: {[item.qry_type for item in out_list]}"
+            f"{qry_key} not exists in out_list: {[item.qry_key for item in out_list]}"
         )
     else:
         description = (
-            f"Not found by {qry_type} and {json.dumps(params, default=str, ensure_ascii=False)}"
+            f"Not found by {qry_key} and {json.dumps(params, default=str, ensure_ascii=False)}"
             f"\nCandidate: {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
         )
     raise ValueError(description)

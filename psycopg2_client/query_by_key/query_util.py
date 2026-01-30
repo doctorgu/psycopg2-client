@@ -1,7 +1,7 @@
-"""client_util"""
+"""query_by_key_util"""
 
 import re
-
+from datetime import datetime
 
 def get_conditional(qry_str: str, params: dict) -> str:
     """
@@ -115,3 +115,53 @@ def rep_kv(query: str, tab_count: int, **kwargs) -> str:
         ret = ret.replace("{" + k + "}", str(v))
 
     return ret
+
+
+def get_query_with_value(qry_str: str, params: dict) -> str:
+    """replace raw query to value filled query"""
+
+    def escape_literal(value) -> str:
+        ret = ""
+        if isinstance(value, str):
+            ret = "'" + value.replace("'", "''") + "'"
+        elif isinstance(value, datetime):
+            ret = f"'{value.strftime('%Y-%m-%d %H:%M:%S.%f')}'::TIMESTAMP"
+        elif isinstance(value, list):
+            ret = f"ARRAY{str(value)}"
+        elif value is None:
+            ret = "NULL"
+        else:
+            ret = str(value)
+        return ret
+
+    # query_raw = sql.SQL(qry_str).as_string(conn)
+    # query_replaced = query_raw
+    query_replaced = qry_str
+    for key, value in params.items():
+        find = f"%({key})s"
+        if find in query_replaced:
+            replace = escape_literal(value)
+            query_replaced = query_replaced.replace(find, replace)
+    # %% -> % : psycopg2
+    # {{}} -> {} : python
+    query_replaced = (
+        query_replaced.replace("%%", "%").replace("{{", "{").replace("}}", "}")
+    )
+
+    return query_replaced
+
+
+def replace_en_ko_column_alias(qry_str: str, en: bool) -> str:
+    """ "
+    return en part or ko part separated by '|' using en variable
+    ex:
+    tbl.obj_nm "File Name|파일명"
+    ->
+    tbl.obj_nm "File Name"
+    """
+
+    pattern = r'(?P<ws>\s)"(?P<en>[^"]+)\|(?P<ko>[^"]+)"'
+    en_ko = "en" if en else "ko"
+    repl = rf'\g<ws>"\g<{en_ko}>"'
+    qry_str_new = re.sub(pattern, repl, qry_str, 0, re.MULTILINE | re.IGNORECASE)
+    return qry_str_new

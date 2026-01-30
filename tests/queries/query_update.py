@@ -1,6 +1,6 @@
 """query for schema"""
 
-qry_dic = dict()
+qry_dic: dict[str, str] = {}
 
 qry_dic.update(
     {

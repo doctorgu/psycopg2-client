@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class DataMock(BaseModel):
     """mock model for common"""
 
-    qry_type: str
+    qry_key: str
     params: dict
     en: bool = False
     params_ignore: list[str] = []

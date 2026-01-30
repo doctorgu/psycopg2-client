@@ -11,7 +11,7 @@ params_ignore_common = ["insert_time", "update_time"]
 
 rows_list.append(
     ReadRowsMock(
-        qry_type="read_user_id_all",
+        qry_key="read_user_id_all",
         params={},
         params_ignore=params_ignore_common,
         rows=[
@@ -24,7 +24,7 @@ rows_list.append(
 
 rows_list.append(
     ReadRowsMock(
-        qry_type="read_user_search",
+        qry_key="read_user_search",
         params={"user_id": "gildong.hong", "user_name": ""},
         params_ignore=params_ignore_common,
         rows=[{"user_name": "홍길동"}],
@@ -32,7 +32,7 @@ rows_list.append(
 )
 rows_list.append(
     ReadRowsMock(
-        qry_type="read_user_search",
+        qry_key="read_user_search",
         params={"user_id": "", "user_name": "%김%"},
         params_ignore=params_ignore_common,
         rows=[{"user_name": "김순자"}, {"user_name": "김말자"}],
@@ -41,7 +41,7 @@ rows_list.append(
 
 rows_list.append(
     ReadRowsMock(
-        qry_type="read_user_alias",
+        qry_key="read_user_alias",
         params={"user_id": "gildong.hong"},
         en=True,
         params_ignore=params_ignore_common,
@@ -50,7 +50,7 @@ rows_list.append(
 )
 rows_list.append(
     ReadRowsMock(
-        qry_type="read_user_alias",
+        qry_key="read_user_alias",
         params={"user_id": "gildong.hong"},
         en=False,
         params_ignore=params_ignore_common,
