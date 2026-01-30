@@ -23,6 +23,17 @@ pip install psycopg2-client
 ### 1. Define Queries
 
 ```python
+qry_dic: dict[str, str] = {}
+
+qry_dic.update(
+    {
+        "read_user_id_all": """
+SELECT  user_id
+FROM    t_user
+"""
+    }
+)
+
 qry_dic.update(
     {
         "upsert_user": """
@@ -64,6 +75,7 @@ db_settings = Settings(
     connect_timeout=5,
     use_en_ko_column_alias=True,
     use_conditional=True,
+    all_query=qry_dic,
     before_read_execute=lambda qry_key, params, qry_str, qry_with_value: print(
         f'READ_ROWS_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
     ),
