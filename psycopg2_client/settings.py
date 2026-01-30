@@ -3,12 +3,8 @@
 from dataclasses import dataclass
 from typing import Callable
 
-# pylint: disable=relative-beyond-top-level
-from .query_by_key.settings import Settings as QrySettings
-
-
-@dataclass(frozen=True)
-class Settings(QrySettings):
+@dataclass(frozen=True, kw_only=True)
+class Settings:
     """db client settings"""
 
     host: str
@@ -20,6 +16,19 @@ class Settings(QrySettings):
     minconn: int
     maxconn: int
     connect_timeout: int
+
+    use_en_ko_column_alias: bool
+    """SELECT file_name "File Name|파일명" """
+    use_conditional: bool
+    """
+    #if target == 'korea'
+        FROM tbl_korea
+    #else
+        FROM tbl_vietnam
+    #endif
+    """
+    all_query: dict[str, str]
+    """all query information"""
 
     before_read_execute: Callable[[str, dict, str, str], None]
     """
