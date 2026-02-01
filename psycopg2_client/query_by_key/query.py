@@ -37,7 +37,7 @@ class Query:
 
         info = {
             "qry_key": qry_key,
-            "params": [{k: v.replace("%", "{{percent}}")} for k, v in params.items()],
+            "params": [{k: v.replace("%", "{{percent}}")} if isinstance(v, str) else str(v) for k, v in params.items()],
             "func_type": func_type,
             "en": en,
         }
