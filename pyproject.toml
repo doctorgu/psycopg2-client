@@ -8,7 +8,7 @@ version = "1.0.7"
 description = "Psycopg2 helper function to run PostgreSQL query with #if support"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 authors = [
     {name = "Gu Park", email = "doctorgu@kakao.com"}
 ]
@@ -35,3 +35,6 @@ test = [
 homepage = "https://github.com/doctorgu/psycopg2-client"
 repository = "https://github.com/doctorgu/psycopg2-client"
 documentation = "https://github.com/doctorgu/psycopg2-client"
+
+[tool.setuptools]
+packages = ["psycopg2_client"]
