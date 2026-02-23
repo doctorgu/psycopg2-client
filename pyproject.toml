@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psycopg2-client"
-version = "1.0.8"
+version = "1.0.9"
 description = "Psycopg2 helper function to run PostgreSQL query with #if support"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,7 @@ test = [
     "pytest-env",
     "pytest-mock",
     "pytest-asyncio",
+    "build"
 ]
 
 [project.urls]
@@ -36,5 +37,7 @@ homepage = "https://github.com/doctorgu/psycopg2-client"
 repository = "https://github.com/doctorgu/psycopg2-client"
 documentation = "https://github.com/doctorgu/psycopg2-client"
 
-[tool.setuptools]
-packages = ["psycopg2_client"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["psycopg2_client*"] # to include query_by_key sub dir
+namespaces = true

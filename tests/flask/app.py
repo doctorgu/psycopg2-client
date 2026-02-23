@@ -60,7 +60,9 @@ def upsert_user_params_out():
 
     params_out = {"user_name": "", "user_rank": 0}
     db_client.update(
-        "upsert_user", {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 0}, params_out
+        "upsert_user",
+        {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 0},
+        params_out,
     )
 
     # user_name, user_rank after update: 홍길동
@@ -194,6 +196,7 @@ def read_using_en_ko2():
     # [{"아이디": "gildong.hong", "이름": "홍길동", "순위": 1}]
     return get_json(fn_name=read_using_en_ko2.__name__, message=rows)
 
+
 @app.route("/read-using-conditional1")
 def read_using_conditional1():
     """read using conditional 1 (#if #elif #endif)"""
@@ -225,7 +228,9 @@ def read_using_conditional2():
     # FROM    t_user
     # WHERE   1 = 1
     #         AND user_name ILIKE %(user_name)s
-    rows = db_client.read_rows("read_user_search", {"user_id": "", "user_name": "%김%", "user_rank": 0})
+    rows = db_client.read_rows(
+        "read_user_search", {"user_id": "", "user_name": "%김%", "user_rank": 0}
+    )
     # ['김순자', '김말자']
     return get_json(
         fn_name=read_using_conditional2.__name__,
@@ -243,7 +248,9 @@ def read_using_conditional3():
     # FROM    t_user
     # WHERE   1 = 1
     #         AND user_rank <= %(user_rank)s
-    rows = db_client.read_rows("read_user_search", {"user_id": "", "user_name": "", "user_rank": 3})
+    rows = db_client.read_rows(
+        "read_user_search", {"user_id": "", "user_name": "", "user_rank": 3}
+    )
     # ['홍길동', '김순자', '김말자']
     return get_json(
         fn_name=read_using_conditional2.__name__,
@@ -291,5 +298,6 @@ def use_with():
         )
         # 0 because rolled back all upsert_user
         return get_json(fn_name=use_with.__name__, message=f"len: {len(rows)}")
+
 
 # flask --app .\tests\flask\app.py run --debug

@@ -7,6 +7,7 @@ from tests.db_client import DbClient
 from tests.db_settings import db_settings
 from psycopg2_client.client import Client
 
+
 def create_tables():
     """create tables"""
 
@@ -35,7 +36,9 @@ def upsert_user_params_out():
 
     params_out = {"user_name": "", "user_rank": 0}
     db_client.update(
-        "upsert_user", {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 1}, params_out
+        "upsert_user",
+        {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 1},
+        params_out,
     )
 
     # user_name, user_rank after update: 홍길동
@@ -75,7 +78,10 @@ def upsert_delete_user_with():
         id_ = "youngja.lee"
         user_name = "이영자"
         user_rank = 4
-        db_client.update("upsert_user", {"user_id": id_, "user_name": user_name, "user_rank": user_rank})
+        db_client.update(
+            "upsert_user",
+            {"user_id": id_, "user_name": user_name, "user_rank": user_rank},
+        )
 
         row_count = db_client.update("delete_user", {"user_id": id_})
 
@@ -167,6 +173,7 @@ def read_using_conditional2():
     # ['김순자', '김말자']
     print(read_using_conditional2.__name__, [row["user_name"] for row in rows])
 
+
 def read_using_conditional3():
     """read using conditional 3 (#if #elif #endif)"""
 
@@ -191,6 +198,7 @@ def use_db_client():
 
     # {"user_id": "gildong.hong"}
     print(use_db_client.__name__, row)
+
 
 def use_with():
     """use with to use transaction (all or nothing)"""
@@ -220,6 +228,7 @@ def use_with():
         )
         # 0 because rolled back all upsert_user
         print(use_with.__name__, "len:", len(rows))
+
 
 create_tables()
 upsert_user()
