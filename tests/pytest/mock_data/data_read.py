@@ -25,7 +25,7 @@ rows_list.append(
 rows_list.append(
     ReadRowsMock(
         qry_key="read_user_search",
-        params={"user_id": "gildong.hong", "user_name": ""},
+        params={"user_id": "gildong.hong", "user_name": "", "user_rank": 0},
         params_ignore=params_ignore_common,
         rows=[{"user_name": "홍길동"}],
     )
@@ -33,9 +33,21 @@ rows_list.append(
 rows_list.append(
     ReadRowsMock(
         qry_key="read_user_search",
-        params={"user_id": "", "user_name": "%김%"},
+        params={"user_id": "", "user_name": "%김%", "user_rank": 0},
         params_ignore=params_ignore_common,
         rows=[{"user_name": "김순자"}, {"user_name": "김말자"}],
+    )
+)
+rows_list.append(
+    ReadRowsMock(
+        qry_key="read_user_search",
+        params={"user_id": "", "user_name": "", "user_rank": 3},
+        params_ignore=params_ignore_common,
+        rows=[
+            {"user_name": "홍길동"},
+            {"user_name": "김순자"},
+            {"user_name": "김말자"},
+        ],
     )
 )
 
@@ -45,7 +57,7 @@ rows_list.append(
         params={"user_id": "gildong.hong"},
         en=True,
         params_ignore=params_ignore_common,
-        rows=[{"Id": "gildong.hong", "Name": "홍길동"}],
+        rows=[{"Id": "gildong.hong", "Name": "홍길동", "Rank": 1}],
     )
 )
 rows_list.append(
@@ -54,6 +66,6 @@ rows_list.append(
         params={"user_id": "gildong.hong"},
         en=False,
         params_ignore=params_ignore_common,
-        rows=[{"아이디": "gildong.hong", "이름": "홍길동"}],
+        rows=[{"아이디": "gildong.hong", "이름": "홍길동", "순위": 1}],
     )
 )

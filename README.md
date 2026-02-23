@@ -40,19 +40,20 @@ qry_dic.update(
 WITH t AS (
     INSERT INTO t_user
         (
-            user_id, user_name
+            user_id, user_name, user_rank
         )
     VALUES
         (
-            %(user_id)s, %(user_name)s
+            %(user_id)s, %(user_name)s, %(user_rank)s
         )
     ON CONFLICT (user_id)
     DO UPDATE
     SET     user_name = %(user_name)s,
+            user_rank = %(user_rank)s,
             update_time = NOW()
-    RETURNING user_name
+    RETURNING user_name, user_rank
 )
-SELECT  user_name
+SELECT  user_name, user_rank
 FROM    t;
 """
     }
@@ -116,7 +117,7 @@ Returns affected row count:
 ```python
 affected = db.update(
     "upsert_user",
-    {"user_id": "gildong.hong", "user_name": "홍길동"}
+    {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 1}
 )
 print("Affected rows:", affected)  # 1
 ```
@@ -124,21 +125,21 @@ print("Affected rows:", affected)  # 1
 ### Capture Output Parameters
 
 ```python
-params_out = {"user_name": ""}
+params_out = {"user_name": "", "user_rank": 0}
 db.update(
     "upsert_user",
-    {"user_id": "gildong.hong", "user_name": "홍길동"},
+    {"user_id": "gildong.hong", "user_name": "홍길동", "user_rank": 1},
     params_out=params_out
 )
-print("Returned name:", params_out["user_name"])  # 홍길동
+print("Returned name:", params_out["user_name"], params_out["user_rank"])  # 홍길동 1
 ```
 
 ### `updates()` — Batch Execution
 
 ```python
 batch = [
-    ("upsert_user", {"user_id": "sunja.kim", "user_name": "김순자"}),
-    ("upsert_user", {"user_id": "malja.kim", "user_name": "김말자"}),
+    ("upsert_user", {"user_id": "sunja.kim", "user_name": "김순자", "user_rank": 2}),
+    ("upsert_user", {"user_id": "malja.kim", "user_name": "김말자", "user_rank": 3}),
 ]
 
 results = db.updates(batch)
@@ -152,7 +153,7 @@ Automatically commits on success, rolls back on exception:
 ```python
 with Client(db_settings=db_settings) as db:
     new_id = "youngja.lee"
-    db.update("upsert_user", {"user_id": new_id, "user_name": "이영자"})
+    db.update("upsert_user", {"user_id": new_id, "user_name": "이영자", "user_rank": 4})
     db.update("delete_user", {"user_id": new_id})  # Oops! Will rollback entire block
     print("This won't print if error occurs")
 ```
@@ -221,7 +222,7 @@ Enabled when `use_en_ko_column_alias=True` and `en` not ommited
 qry_dic.update(
     {
         "read_user_alias": """
-SELECT  user_id "Id|아이디", user_name "Name|이름"
+SELECT  user_id "Id|아이디", user_name "Name|이름", user_rank "Rank|순위"
 FROM    t_user
 WHERE   user_id = %(user_id)s
 """
@@ -254,13 +255,15 @@ Enabled when `use_conditional=True`
 qry_dic.update(
     {
         "read_user_search": """
-SELECT  user_id, user_name, insert_time, update_time
+SELECT  user_id, user_name, user_rank, insert_time, update_time
 FROM    t_user
 WHERE   1 = 1
 #if user_id
         AND user_id = %(user_id)s
 #elif user_name
         AND user_name ILIKE %(user_name)s
+#elif user_rank
+        AND user_rank <= %(user_rank)s
 #endif
 """
     }
@@ -273,7 +276,7 @@ WHERE   1 = 1
 ```python
 rows = db.read_rows(
     "read_user_search",
-    {"user_id": "gildong.hong", "user_name": ""}
+    {"user_id": "gildong.hong", "user_name": "", "user_rank": 0}
 )
 print([r["user_name"] for r in rows])
 # ['홍길동']
@@ -284,10 +287,21 @@ print([r["user_name"] for r in rows])
 ```python
 rows = db.read_rows(
     "read_user_search",
-    {"user_id": "", "user_name": "%김%"}
+    {"user_id": "", "user_name": "%김%", "user_rank": 0}
 )
 print([r["user_name"] for r in rows])
 # ['김순자', '김말자']
+```
+
+### Example: Search by `user_rank` (partial match)
+
+```python
+rows = db.read_rows(
+    "read_user_search",
+    {"user_id": "", "user_name": "", "user_rank": 3}
+)
+print([r["user_name"] for r in rows])
+# ['홍길동', '김순자', '김말자']
 ```
 
 ## Logging support

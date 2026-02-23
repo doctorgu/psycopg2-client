@@ -18,12 +18,17 @@ out_list.append(
 out_list.append(
     UpdatesMock(
         qry_key="upsert_user",
-        params={"user_id": "gildong.hong", "user_name": "홍길동"},
+        params={
+            "user_id": "gildong.hong",
+            "user_name": "홍길동",
+            "user_rank": 1,
+        },
         params_ignore=[
             "user_id",
             "user_name",
+            "user_rank"
         ],
-        params_out={"user_name": ""},
+        params_out={"user_name": "", "user_rank": 0},
         row_count=1,
     )
 )
