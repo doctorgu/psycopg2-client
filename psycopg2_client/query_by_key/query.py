@@ -37,10 +37,7 @@ class Query:
 
         info = {
             "qry_key": qry_key,
-            "params": [
-                {k: v.replace("%", "{{percent}}")} if isinstance(v, str) else str(v)
-                for k, v in params.items()
-            ],
+            "params": params,
             "func_type": func_type,
             "en": en,
         }
@@ -51,5 +48,5 @@ class Query:
             query = get_conditional(query, params)
 
         return (
-            f"/* {json.dumps(info, ensure_ascii=False, default=serial_date)} */{query}"
+            f"/* {json.dumps(info, ensure_ascii=False, default=serial_date).replace("%", "{percent}")} */{query}"
         )
