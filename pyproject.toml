@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psycopg2-client"
-version = "1.0.10"
+version = "1.1.1"
 description = "Psycopg2 helper function to run PostgreSQL query with #if support"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,6 +20,8 @@ dependencies = [
     "python-dotenv",
     "pydantic-settings",
     "Flask",
+    "PyYAML",
+    "ruff"
 ]
 
 [project.optional-dependencies]
@@ -41,3 +43,26 @@ documentation = "https://github.com/doctorgu/psycopg2-client"
 where = ["."]
 include = ["psycopg2_client*"] # to include query_by_key sub dir
 namespaces = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", # default style,
+    "F", # error (bug)
+    "I", # import
+    "B", # bugbear
+    "UP", # recent python grammar
+    # "T20", # No print, Only Logger
+]
+
+[tool.ruff.format]
+line-ending = "cr-lf"

@@ -3,12 +3,13 @@
 import json
 import re
 from typing import Literal
-from psycopg2 import pool, sql
-from mock_data.data_all import (
-    get_rows_by_params,
-    get_out_by_params,
-)
 
+from psycopg2 import pool, sql
+
+from tests.pytest.mock_data.data_all import (
+    get_out_by_params,
+    get_rows_by_params,
+)
 
 
 def patch_psycopg2(mocker):
@@ -21,7 +22,7 @@ def patch_psycopg2(mocker):
             self.qry_str = ""
             self.qry_key = ""
             self.func_type: Literal["update", "read", "csv"] = "read"
-            self.params: dict[str, any] = {} # type: ignore
+            self.params: dict[str, any] = {}  # type: ignore
             self.en: bool = False
 
             self.rows: list[dict] = []
@@ -29,10 +30,10 @@ def patch_psycopg2(mocker):
             self.rowcount: int = 0
             self._first_fetch_csv: bool = True
 
-        def execute(self, qry_str: str, params: dict[str, any]): # type: ignore
+        def execute(self, qry_str: str, params: dict[str, any]):  # type: ignore
             """execute"""
 
-            def get_header() -> dict[Literal["qry_key", "func_type", "en"], any]: # type: ignore
+            def get_header() -> dict[Literal["qry_key", "func_type", "en"], any]:  # type: ignore
                 ret = re.match(r"/\*(.+)\*/", qry_str)
                 if not ret:
                     raise ValueError("no header in query")
@@ -57,9 +58,7 @@ def patch_psycopg2(mocker):
                     self.rows = rows
                     self.row = row
                 elif func_type == "update":
-                    params_out, row_count = get_out_by_params(
-                        self.qry_key, self.params
-                    )
+                    params_out, row_count = get_out_by_params(self.qry_key, self.params)
                     self.row = params_out
                     self.rowcount = row_count
 
@@ -141,7 +140,6 @@ def patch_psycopg2(mocker):
     class PoolMock:
         """PoolMock"""
 
-        # pylint:disable=invalid-name
         def ThreadedConnectionPool(self, minconn, maxconn, **kwargs):
             """ThreadedConnectionPool"""
             return ThreadedConnectionPoolMock(
@@ -163,7 +161,6 @@ def patch_psycopg2(mocker):
     class SqlMock:
         """SqlMock"""
 
-        # pylint: disable=invalid-name
         def SQL(self, string: str):
             """SQL"""
             return SqlMock2(string)

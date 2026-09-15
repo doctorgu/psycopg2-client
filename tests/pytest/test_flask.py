@@ -1,7 +1,7 @@
 """test Flask"""
 
-from tests.pytest.test_fn_common import patch_psycopg2
 from tests.flask.app import app
+from tests.pytest.test_fn_common import patch_psycopg2
 
 
 def test_flask(mocker):

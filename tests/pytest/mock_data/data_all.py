@@ -2,20 +2,24 @@
 
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable
 
 from tests.pytest.mock_data.data_mock_model import (
     ReadRowsMock,
     UpdatesMock,
 )
 from tests.pytest.mock_data.data_read import (
-    rows_list as rows_read,
     out_list as out_read,
+)
+from tests.pytest.mock_data.data_read import (
+    rows_list as rows_read,
+)
+from tests.pytest.mock_data.data_update import (
+    out_list as out_update,
 )
 from tests.pytest.mock_data.data_update import (
     rows_list as rows_update,
-    out_list as out_update,
 )
 
 rows_combined = rows_read + rows_update
@@ -164,12 +168,15 @@ def get_rows_by_params(qry_key: str, params: dict, en: bool = False) -> list[dic
 
     description = ""
     if not qry_key_found:
-        description = f"{qry_key} not exists in rows_list: {[item.qry_key for item in rows_list]}"
+        description = (
+            f"{qry_key} not exists in rows_list: {[item.qry_key for item in rows_list]}"
+        )
     else:
         description = (
             f"Not found by {qry_key}"
             f" and {json.dumps(params, default=str, ensure_ascii=False)} and en:{en}"
-            f"\nCandidate: {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
+            f"\nCandidate:"
+            f" {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
         )
     raise ValueError(description)
 
@@ -203,7 +210,9 @@ def get_out_by_params(qry_key: str, params: dict) -> tuple[dict, int]:
         )
     else:
         description = (
-            f"Not found by {qry_key} and {json.dumps(params, default=str, ensure_ascii=False)}"
-            f"\nCandidate: {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
+            f"Not found by {qry_key}"
+            f" and {json.dumps(params, default=str, ensure_ascii=False)}"
+            f"\nCandidate:"
+            f" {json.dumps(params_data_candidate, default=str, ensure_ascii=False)}"
         )
     raise ValueError(description)

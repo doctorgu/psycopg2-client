@@ -1,11 +1,13 @@
 """flask app"""
 
-from datetime import datetime
-from flask import Flask, jsonify, render_template, Response
+from datetime import UTC, datetime
+
+from flask import Flask, Response, jsonify, render_template
 from psycopg2.extras import RealDictRow
-from tests.db_settings import db_settings
-from tests.db_client import DbClient
+
 from psycopg2_client.client import Client
+from tests.db_client import DbClient
+from tests.db_settings import db_settings
 
 app = Flask(__name__)
 
@@ -68,7 +70,10 @@ def upsert_user_params_out():
     # user_name, user_rank after update: 홍길동
     return get_json(
         fn_name=upsert_user_params_out.__name__,
-        message=f'user_name after update: {params_out["user_name"]}, {params_out["user_rank"]}',
+        message=(
+            f"user_name after update:"
+            f" {params_out['user_name']}, {params_out['user_rank']}"
+        ),
     )
 
 
@@ -149,7 +154,7 @@ def read_csv_partial():
     """read csv partial"""
 
     db_client = Client(db_settings=db_settings)
-    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+    filename = f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}.csv"
 
     return Response(
         db_client.read_csv_partial("read_csv_partial", {}),

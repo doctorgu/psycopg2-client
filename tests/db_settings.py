@@ -1,7 +1,9 @@
 """db settings"""
 
 import os
+
 from dotenv import load_dotenv
+
 from psycopg2_client.settings import Settings
 from tests.queries.query_all import all_query
 
@@ -20,15 +22,15 @@ db_settings = Settings(
     use_conditional=True,
     all_query=all_query,
     before_read_execute=lambda qry_key, params, qry_str, qry_with_value: print(
-        f'READ_ROWS_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
+        f'READ_ROWS_START, QRY_KEY: "{qry_key}", QRY_WITH_VALUE: {qry_with_value}'
     ),
     after_read_execute=lambda qry_key, duration: print(
-        f'READ_ROWS_END, QRY_KEY: "{qry_key}"' f", DURATION: {duration}"
+        f'READ_ROWS_END, QRY_KEY: "{qry_key}", DURATION: {duration}'
     ),
-    before_update_execute=lambda qry_key, params, params_out, qry_str, qry_with_value: print(
-        f'UPDATES_START, QRY_KEY: "{qry_key}"' f", QRY_WITH_VALUE: {qry_with_value}"
+    before_update_execute=lambda qry_key, params, params_out, qry_str, qry_with_value: (
+        print(f'UPDATES_START, QRY_KEY: "{qry_key}", QRY_WITH_VALUE: {qry_with_value}')
     ),
     after_update_execute=lambda qry_key, row_count, params_out, duration: print(
-        f'UPDATES_END, QRY_KEY: "{qry_key}"' f", DURATION: {duration}"
+        f'UPDATES_END, QRY_KEY: "{qry_key}", DURATION: {duration}'
     ),
 )

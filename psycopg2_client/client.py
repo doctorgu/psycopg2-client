@@ -1,20 +1,20 @@
 """database client"""
 
-import csv
-from datetime import datetime
-import time
-import io
 import atexit
-from typing import AsyncGenerator, Generator
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor, RealDictRow
-from psycopg2.extensions import connection
+import csv
+import io
+import time
+from collections.abc import AsyncGenerator, Generator
+from datetime import UTC, datetime
 
-# pylint: disable=relative-beyond-top-level
+from psycopg2 import pool
+from psycopg2.extensions import connection
+from psycopg2.extras import RealDictCursor, RealDictRow
+
+from .query_by_key.query import Query
 from .query_by_key.query_util import (
     get_query_with_value,
 )
-from .query_by_key.query import Query
 from .query_by_key.settings import Settings as QrySettings
 from .settings import Settings
 
@@ -34,14 +34,18 @@ class ClientPool:
             password=db_settings_pool.password,
         )
 
-        print(datetime.now(), self.__class__.__name__, self.__init__.__name__)
+        print(datetime.now(UTC), self.__class__.__name__, self.__init__.__name__)
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Close the shared connection pool."""
         if self.conn_pool:
             self.conn_pool.closeall()
 
-            print(datetime.now(), self.__class__.__name__, self.__exit__.__name__)
+            print(
+                datetime.now(UTC),
+                self.__class__.__name__,
+                self.__exit__.__name__,
+            )
 
     def getconn(self) -> connection:
         """return conn_pool"""
@@ -62,9 +66,6 @@ class Client:
     _conn_pool: ClientPool
 
     def __init__(self, db_settings: Settings):
-        # pylint:disable=global-statement,global-variable-not-assigned
-        global db_set_and_pool
-
         self.conn: connection
         self.in_with_block = False
         self.db_settings = db_settings
@@ -156,7 +157,7 @@ class Client:
                     rows.append(row)
 
             if self.db_settings.after_read_execute:
-                duration = int(round((time.time() - start) * 1000))
+                duration = round((time.time() - start) * 1000)
                 self.db_settings.after_read_execute(qry_key, duration)
 
             if not rows:
@@ -219,7 +220,7 @@ class Client:
         *,
         row_count_partial: int = 100,
         en: bool = False,
-    ) -> AsyncGenerator[bytes, None]:
+    ) -> AsyncGenerator[bytes]:
         """Return rows partially in batches with async
 
         Arguments:
@@ -238,7 +239,7 @@ class Client:
             row_count_partial: int = 100,
             en: bool = False,
             cursor: RealDictCursor,
-        ) -> AsyncGenerator[bytes, None]:
+        ) -> AsyncGenerator[bytes]:
             if not isinstance(params, dict):
                 params = vars(params)
 
@@ -258,23 +259,21 @@ class Client:
             cursor.execute(qry_str, params)
             while True:
                 start = 0
-                if not is_second:
-                    if self.db_settings.before_read_execute:
-                        self.db_settings.before_read_execute(
-                            qry_key,
-                            params,
-                            qry_str,
-                            get_query_with_value(qry_str, params),
-                        )
-                        start = time.time()
+                if not is_second and self.db_settings.before_read_execute:
+                    self.db_settings.before_read_execute(
+                        qry_key,
+                        params,
+                        qry_str,
+                        get_query_with_value(qry_str, params),
+                    )
+                    start = time.time()
 
                 cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
                 rows = cursor.fetchall()
 
-                if not is_second:
-                    if self.db_settings.after_read_execute:
-                        duration = int(round((time.time() - start) * 1000))
-                        self.db_settings.after_read_execute(qry_key, duration)
+                if not is_second and self.db_settings.after_read_execute:
+                    duration = round((time.time() - start) * 1000)
+                    self.db_settings.after_read_execute(qry_key, duration)
 
                 if not rows:
                     break
@@ -324,7 +323,7 @@ class Client:
         *,
         row_count_partial: int = 100,
         en: bool = False,
-    ) -> Generator[bytes, None, None]:
+    ) -> Generator[bytes]:
         """Return rows partially in batches
 
         Arguments:
@@ -343,7 +342,7 @@ class Client:
             row_count_partial: int = 100,
             en: bool = False,
             cursor: RealDictCursor,
-        ) -> Generator[bytes, None, None]:
+        ) -> Generator[bytes]:
             if not isinstance(params, dict):
                 params = vars(params)
 
@@ -363,23 +362,21 @@ class Client:
             cursor.execute(qry_str, params)
             while True:
                 start = 0
-                if not is_second:
-                    if self.db_settings.before_read_execute:
-                        self.db_settings.before_read_execute(
-                            qry_key,
-                            params,
-                            qry_str,
-                            get_query_with_value(qry_str, params),
-                        )
-                        start = time.time()
+                if not is_second and self.db_settings.before_read_execute:
+                    self.db_settings.before_read_execute(
+                        qry_key,
+                        params,
+                        qry_str,
+                        get_query_with_value(qry_str, params),
+                    )
+                    start = time.time()
 
                 cursor.execute(f"FETCH {row_count_partial} FROM {cursor_name}", params)
                 rows = cursor.fetchall()
 
-                if not is_second:
-                    if self.db_settings.after_read_execute:
-                        duration = int(round((time.time() - start) * 1000))
-                        self.db_settings.after_read_execute(qry_key, duration)
+                if not is_second and self.db_settings.after_read_execute:
+                    duration = round((time.time() - start) * 1000)
+                    self.db_settings.after_read_execute(qry_key, duration)
                 if not rows:
                     break
 
@@ -424,11 +421,12 @@ class Client:
         qry_key_params_list: list[tuple[str, dict, dict]] | list[tuple[str, dict]],
     ) -> list[int]:
         """Executes a list of SQL statements within a single transaction.
-        If all SQL commands succeed, returns a list of the number of rows affected by each qry_key.
+        If all SQL commands succeed, returns a list of the number of rows affected
+        by each qry_key.
         If any command fails, an error is raised.
 
         Arguments:
-            qry_key_params_list: A list of tuples, each containing the following two values:
+            qry_key_params_list: A list of tuples, each containing following two values:
                 qry_key: key of the dictionary registered in the clients/queries folder
                 params: key, value pairs to pass as parameters to the SQL query.
 
@@ -497,7 +495,7 @@ class Client:
                                 params_out[k] = v
 
                 if self.db_settings.after_update_execute:
-                    duration = int(round((time.time() - start) * 1000))
+                    duration = round((time.time() - start) * 1000)
                     self.db_settings.after_update_execute(
                         qry_key, row_count, params_out, duration
                     )
@@ -527,8 +525,7 @@ class Client:
         self,
         qry_key: str,
         params: dict,
-        # pylint: disable=dangerous-default-value
-        params_out: dict = {},
+        params_out: dict | None = None,
     ) -> int:
         """call updates"""
 
@@ -540,7 +537,6 @@ class Client:
 def close_all_connection():
     """call when python exits"""
 
-    # pylint:disable=global-statement
     global db_set_and_pool
 
     for v in db_set_and_pool.values():

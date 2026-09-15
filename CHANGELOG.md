@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1]
+
+- Refactoring code to apply ruff format, ruff check
+
+## [1.1.0]
+
+- Query changed to yml file format from python dict format.
+
 ## [1.0.10]
 
 Fixed:

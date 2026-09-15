@@ -2,10 +2,9 @@
 
 import json
 
-
+from psycopg2_client.client import Client
 from tests.db_client import DbClient
 from tests.db_settings import db_settings
-from psycopg2_client.client import Client
 
 
 def create_tables():
