@@ -7,6 +7,7 @@ from typing import Literal
 from .query_util import (
     get_conditional,
     get_include,
+    get_template,
     replace_en_ko_column_alias,
 )
 from .settings import Settings
@@ -51,6 +52,8 @@ class Query:
             query = replace_en_ko_column_alias(query, en)
         if self.qry_settings.use_conditional and "#if" in query:
             query = get_conditional(query, params)
+        if "${" in query:
+            query = get_template(query, params)
 
         info_str = json.dumps(info, ensure_ascii=False, default=serial_date)
         return f"/* {info_str.replace('%', '{percent}')} */{query}"
